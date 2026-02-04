@@ -86,10 +86,26 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE documents TO ${RAG_USER};
 GRANT USAGE, SELECT ON SEQUENCE documents_id_seq TO ${RAG_USER};
 EOF
 
-# 8. Ingestion de la documentation
+# 8. Définition des variables d'environnement
+
+echo ">>> Génération du fichier .env"
+
+cat > .env <<EOF
+DB_NAME=rag
+DB_USER=${RAG_USER}
+DB_PASSWORD=${RAG_PASSWORD}
+DB_HOST=localhost
+DB_PORT=5432
+DOC_DIR=$(pwd)/admin
+EMBEDDING_MODEL=BAAI/bge-base-en-v1.5
+CHUNK_SIZE=250
+EOF
+
+# 9. Ingestion de la documentation
 echo ">>> Ingestion de la documentation PostgreSQL"
 python3 script_python/parse_all.py
 
 echo "=== Installation terminée ==="
 echo "Ton pipeline RAG est prêt à l'emploi."
+
 
