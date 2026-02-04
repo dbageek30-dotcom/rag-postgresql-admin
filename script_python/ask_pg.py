@@ -28,8 +28,8 @@ PG_CONN_INFO = {
 }
 
 # LLM
-LLM_URL = os.getenv("LLM_URL", "http://localhost:11434/api/chat")
-LLM_MODEL = os.getenv("LLM_MODEL", "qwen2.5:7b-instruct-q4_K_M")
+LLM_URL = os.getenv("LLM_URL", "")
+LLM_MODEL = os.getenv("LLM_MODEL", "")
 
 # =========================
 #  Charger les modèles
@@ -106,6 +106,9 @@ def build_context(reranked_rows):
 #  Appel LLM
 # =========================
 def call_llm(question: str, context: str) -> str:
+    if not LLM_URL or not LLM_MODEL:
+        return None  # mode NO LLM automatique
+
     system_prompt = (
         "You are a PostgreSQL server administration assistant. "
         "Answer ONLY using the documentation context provided. "
@@ -129,9 +132,13 @@ def call_llm(question: str, context: str) -> str:
         "stream": False,
     }
 
-    resp = requests.post(LLM_URL, json=payload, timeout=600)
-    resp.raise_for_status()
-    data = resp.json()
+    try:
+        resp = requests.post(LLM_URL, json=payload, timeout=600)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        print(f"[NO LLM] Impossible d'appeler le LLM : {e}")
+        return None
 
     if isinstance(data, dict) and "message" in data:
         return data["message"]["content"]
@@ -146,27 +153,43 @@ def call_llm(question: str, context: str) -> str:
 # =========================
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python3 ask_pg.py \"your question\"")
+        print("Usage: python3 ask_pg.py \"your question\" [--no-llm]")
         sys.exit(1)
 
     question = sys.argv[1]
+    force_no_llm = "--no-llm" in sys.argv
 
     print(f"Question: {question}\n")
 
+    # 1) candidats vectoriels
     candidates = fetch_candidates(question, top_k=30)
+
+    # 2) reranking cross-encoder
     top_rows = rerank_candidates(question, candidates, final_k=6)
 
     if not top_rows:
         print("Aucun contexte trouvé dans la base.")
         sys.exit(0)
 
+    # 3) construction du contexte
     context = build_context(top_rows)
 
-    print("=== CONTEXTE ENVOYÉ AU LLM ===\n")
+    print("=== CONTEXTE ===\n")
     print(context)
-    print("\n=== RÉPONSE DU LLM ===\n")
 
+    # 4) mode NO LLM
+    if force_no_llm:
+        print("\n[NO LLM] Mode forcé (--no-llm). Aucun appel LLM effectué.")
+        return
+
+    # 5) appel LLM si dispo
     answer = call_llm(question, context)
+
+    if answer is None:
+        print("\n[NO LLM] Aucun LLM configuré ou appel impossible.")
+        return
+
+    print("\n=== RÉPONSE DU LLM ===\n")
     print(answer)
 
 
