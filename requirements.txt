@@ -4,4 +4,3 @@ requests
 tqdm
 numpy
 sentence-transformers
-python-dotenv
