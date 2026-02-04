@@ -51,25 +51,39 @@ def get_embedding(text: str):
 # =========================
 #  Recherche vectorielle
 # =========================
-def fetch_candidates(question: str, top_k: int = 30):
+def fetch_candidates(question: str, top_k: int = 30, source: str = None):
     emb = get_embedding(question)
 
     conn = psycopg2.connect(**PG_CONN_INFO)
     cur = conn.cursor()
 
-    query = """
-        SELECT
-            metadata->>'title'   AS title,
-            metadata->>'html_id' AS html_id,
-            content,
-            embedding <-> %s::vector AS distance
-        FROM documents
-        ORDER BY embedding <-> %s::vector
-        LIMIT %s;
-    """
-    cur.execute(query, (emb, emb, top_k))
-    rows = cur.fetchall()
+    if source:
+        query = """
+            SELECT
+                metadata->>'title'   AS title,
+                metadata->>'html_id' AS html_id,
+                content,
+                embedding <-> %s::vector AS distance
+            FROM documents
+            WHERE source = %s
+            ORDER BY embedding <-> %s::vector
+            LIMIT %s;
+        """
+        cur.execute(query, (emb, source, emb, top_k))
+    else:
+        query = """
+            SELECT
+                metadata->>'title'   AS title,
+                metadata->>'html_id' AS html_id,
+                content,
+                embedding <-> %s::vector AS distance
+            FROM documents
+            ORDER BY embedding <-> %s::vector
+            LIMIT %s;
+        """
+        cur.execute(query, (emb, emb, top_k))
 
+    rows = cur.fetchall()
     cur.close()
     conn.close()
     return rows
@@ -149,48 +163,59 @@ def call_llm(question: str, context: str) -> str:
 
 
 # =========================
-#  Main
+#  Fonction API-friendly
+# =========================
+def ask_pg(question: str, no_llm: bool = False, source: str = None) -> str:
+    candidates = fetch_candidates(question, top_k=30, source=source)
+    top_rows = rerank_candidates(question, candidates, final_k=6)
+
+    if not top_rows:
+        return "Aucun contexte trouvé dans la base."
+
+    context = build_context(top_rows)
+
+    if no_llm:
+        return (
+            "=== CONTEXTE ===\n\n"
+            + context
+            + "\n\n[NO LLM] Mode forcé (--no-llm). Aucun appel LLM effectué."
+        )
+
+    answer = call_llm(question, context)
+
+    if answer is None:
+        return (
+            "=== CONTEXTE ===\n\n"
+            + context
+            + "\n\n[NO LLM] Aucun LLM configuré ou appel impossible."
+        )
+
+    return (
+        "=== CONTEXTE ===\n\n"
+        + context
+        + "\n\n=== RÉPONSE DU LLM ===\n\n"
+        + answer
+    )
+
+
+# =========================
+#  Main CLI
 # =========================
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python3 ask_pg.py \"your question\" [--no-llm]")
+        print("Usage: python3 ask_pg.py \"your question\" [--no-llm] [--source=postgresql]")
         sys.exit(1)
 
     question = sys.argv[1]
     force_no_llm = "--no-llm" in sys.argv
 
-    print(f"Question: {question}\n")
+    source = None
+    for arg in sys.argv:
+        if arg.startswith("--source="):
+            source = arg.split("=")[1]
 
-    # 1) candidats vectoriels
-    candidates = fetch_candidates(question, top_k=30)
-
-    # 2) reranking cross-encoder
-    top_rows = rerank_candidates(question, candidates, final_k=6)
-
-    if not top_rows:
-        print("Aucun contexte trouvé dans la base.")
-        sys.exit(0)
-
-    # 3) construction du contexte
-    context = build_context(top_rows)
-
-    print("=== CONTEXTE ===\n")
-    print(context)
-
-    # 4) mode NO LLM
-    if force_no_llm:
-        print("\n[NO LLM] Mode forcé (--no-llm). Aucun appel LLM effectué.")
-        return
-
-    # 5) appel LLM si dispo
-    answer = call_llm(question, context)
-
-    if answer is None:
-        print("\n[NO LLM] Aucun LLM configuré ou appel impossible.")
-        return
-
-    print("\n=== RÉPONSE DU LLM ===\n")
-    print(answer)
+    result = ask_pg(question, no_llm=force_no_llm, source=source)
+    print(result)
 
 
 if __name__ == "__main__":

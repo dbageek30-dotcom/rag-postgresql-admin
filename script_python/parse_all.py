@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DOC_DIR = os.getenv("DOC_DIR")
+BASE_DIR = os.getenv("DOC_DIR")  # ex: admin/
 DB_NAME = os.getenv("DB_NAME", "rag")
 DB_USER = os.getenv("DB_USER", "rag_user")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
@@ -21,7 +21,7 @@ MODEL_NAME = os.getenv("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5")
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 250))
 
 print("=== Configuration utilisée ===")
-print(f"Dossier HTML : {DOC_DIR}")
+print(f"Dossier racine : {BASE_DIR}")
 print(f"Base PostgreSQL : {DB_NAME}")
 print(f"Utilisateur : {DB_USER}")
 print(f"Modèle : {MODEL_NAME}")
@@ -72,50 +72,68 @@ def chunk_text(text, max_tokens=250):
     return chunks
 
 # ============================
-# 5. Vérification du dossier HTML
+# 5. Vérification du dossier racine
 # ============================
 
-if not DOC_DIR or not os.path.isdir(DOC_DIR):
-    print(f"Erreur : dossier introuvable : {DOC_DIR}")
+if not BASE_DIR or not os.path.isdir(BASE_DIR):
+    print(f"Erreur : dossier introuvable : {BASE_DIR}")
     exit(1)
 
-files = [f for f in os.listdir(DOC_DIR) if f.endswith(".html")]
-print(f"Fichiers HTML trouvés : {len(files)}")
-
 # ============================
-# 6. Parcours des fichiers HTML
+# 6. Parcours multi-sources
 # ============================
 
-for filename in files:
-    path = os.path.join(DOC_DIR, filename)
+for source in os.listdir(BASE_DIR):
+    source_path = os.path.join(BASE_DIR, source)
+    if not os.path.isdir(source_path):
+        continue
 
-    with open(path, "r", encoding="utf-8") as f:
-        soup = BeautifulSoup(f, "html.parser")
+    for version in os.listdir(source_path):
+        version_path = os.path.join(source_path, version)
+        if not os.path.isdir(version_path):
+            continue
 
-    sections = soup.find_all(["div"], class_=["sect1", "sect2", "sect3"])
-    print(f"{filename} → {len(sections)} sections")
+        print(f"\n=== Ingestion : {source} / {version} ===")
 
-    for sect in sections:
-        title_tag = sect.find(["h1", "h2", "h3"])
-        title = title_tag.get_text(strip=True) if title_tag else "Untitled"
+        html_files = [f for f in os.listdir(version_path) if f.endswith(".html")]
+        print(f"Fichiers HTML trouvés : {len(html_files)}")
 
-        html_id = sect.get("id", "unknown")
-        content = sect.get_text(" ", strip=True)
+        for filename in html_files:
+            path = os.path.join(version_path, filename)
 
-        chunks = chunk_text(content, max_tokens=CHUNK_SIZE)
+            with open(path, "r", encoding="utf-8") as f:
+                soup = BeautifulSoup(f, "html.parser")
 
-        for i, chunk in enumerate(chunks):
-            emb = model.encode(chunk).tolist()
+            sections = soup.find_all(["div"], class_=["sect1", "sect2", "sect3"])
+            print(f"{filename} → {len(sections)} sections")
 
-            cur.execute("""
-                INSERT INTO documents (content, embedding, metadata)
-                VALUES (%s, %s, jsonb_build_object(
-                    'title', %s,
-                    'html_id', %s,
-                    'file', %s,
-                    'chunk_id', %s
-                ));
-            """, (chunk, emb, title, html_id, filename, i))
+            for sect in sections:
+                title_tag = sect.find(["h1", "h2", "h3"])
+                title = title_tag.get_text(strip=True) if title_tag else "Untitled"
+
+                html_id = sect.get("id", "unknown")
+                content = sect.get_text(" ", strip=True)
+
+                chunks = chunk_text(content, max_tokens=CHUNK_SIZE)
+
+                for i, chunk in enumerate(chunks):
+                    emb = model.encode(chunk).tolist()
+
+                    cur.execute("""
+                        INSERT INTO documents (content, embedding, source, version, metadata)
+                        VALUES (
+                            %s,
+                            %s,
+                            %s,
+                            %s,
+                            jsonb_build_object(
+                                'title', %s,
+                                'html_id', %s,
+                                'file', %s,
+                                'chunk_id', %s
+                            )
+                        );
+                    """, (chunk, emb, source, version, title, html_id, filename, i))
 
 # ============================
 # 7. Finalisation
@@ -125,5 +143,5 @@ conn.commit()
 cur.close()
 conn.close()
 
-print("Import complet terminé.")
+print("\nImport complet terminé.")
 
