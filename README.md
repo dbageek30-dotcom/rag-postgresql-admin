@@ -1,1 +1,0 @@
-# PostgreSQL Admin RAG Pipeline
