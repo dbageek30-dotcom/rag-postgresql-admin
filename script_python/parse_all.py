@@ -104,15 +104,55 @@ for source in os.listdir(BASE_DIR):
             with open(path, "r", encoding="utf-8") as f:
                 soup = BeautifulSoup(f, "html.parser")
 
-            sections = soup.find_all(["div"], class_=["sect1", "sect2", "sect3"])
+            # ============================
+            # Sélection des sections selon la source
+            # ============================
+
+            if source == "postgresql":
+                # HTML généré depuis AsciiDoc → div.sect1/2/3
+                sections = soup.find_all("div", class_=["sect1", "sect2", "sect3"])
+
+            elif source == "patroni":
+                # HTML généré par Sphinx → <section>
+                sections = soup.find_all("section")
+
+            elif source == "pgbackrest":
+                # Documentation HTML officielle pgBackRest → <div class="section1">
+                sections = soup.find_all("div", class_="section1")
+
+            else:
+                # fallback générique
+                sections = soup.find_all("section")
+
             print(f"{filename} → {len(sections)} sections")
 
+            # ============================
+            # Extraction et insertion
+            # ============================
+
             for sect in sections:
-                title_tag = sect.find(["h1", "h2", "h3"])
+
+                # Titre selon la source
+                if source == "pgbackrest":
+                    title_tag = sect.find("div", class_="section1-title")
+                else:
+                    title_tag = sect.find(["h1", "h2", "h3"])
+
                 title = title_tag.get_text(strip=True) if title_tag else "Untitled"
 
-                html_id = sect.get("id", "unknown")
-                content = sect.get_text(" ", strip=True)
+                # ID HTML
+                if source == "pgbackrest":
+                    anchor = sect.find("a")
+                    html_id = anchor.get("id", "unknown") if anchor else "unknown"
+                else:
+                    html_id = sect.get("id", "unknown")
+
+                # Contenu
+                if source == "pgbackrest":
+                    body = sect.find("div", class_="section-body")
+                    content = body.get_text(" ", strip=True) if body else ""
+                else:
+                    content = sect.get_text(" ", strip=True)
 
                 chunks = chunk_text(content, max_tokens=CHUNK_SIZE)
 
