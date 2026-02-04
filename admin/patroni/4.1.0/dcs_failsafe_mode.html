@@ -1,0 +1,188 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DCS Failsafe Mode &mdash; Patroni 4.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/github_style.css?v=1093691d" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=977c162b" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=42d1b3bd"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Using Patroni with Kubernetes" href="kubernetes.html" />
+    <link rel="prev" title="Pause/Resume mode for the cluster" href="pause.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Patroni
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="README.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="patroni_configuration.html">Patroni configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rest_api.html">Patroni REST API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="patronictl.html">patronictl</a></li>
+<li class="toctree-l1"><a class="reference internal" href="replica_bootstrap.html">Replica imaging and bootstrap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="replication_modes.html">Replication modes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="standby_cluster.html">Standby cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="watchdog.html">Watchdog support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pause.html">Pause/Resume mode for the cluster</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">DCS Failsafe Mode</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#the-problem">The problem</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#reasons-for-the-current-implementation">Reasons for the current implementation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id2">DCS Failsafe Mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#low-level-implementation-details">Low-level implementation details</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#f-a-q">F.A.Q.</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="kubernetes.html">Using Patroni with Kubernetes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="citus.html">Citus support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="existing_data.html">Convert a Standalone to a Patroni Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="existing_data.html#major-upgrade-of-postgresql-version">Major Upgrade of PostgreSQL Version</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tools_integration.html">Integration with other tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security Considerations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ha_multi_dc.html">HA multi datacenter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Release notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributing</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Patroni</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">DCS Failsafe Mode</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/patroni/patroni/blob/master/docs/dcs_failsafe_mode.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="dcs-failsafe-mode">
+<span id="id1"></span><h1>DCS Failsafe Mode<a class="headerlink" href="#dcs-failsafe-mode" title="Link to this heading"></a></h1>
+<section id="the-problem">
+<h2>The problem<a class="headerlink" href="#the-problem" title="Link to this heading"></a></h2>
+<p>Patroni is heavily relying on Distributed Configuration Store (DCS) to solve the task of leader elections and detect network partitioning. That is, the node is allowed to run Postgres as the primary only if it can update the leader lock in DCS. In case the update of the leader lock fails, Postgres is immediately demoted and started as read-only. Depending on which DCS is used, the chances of hitting the “problem” differ. For example, with Etcd which is only used for Patroni, chances are close to zero, while with K8s API (backed by Etcd) it could be observed more frequently.</p>
+</section>
+<section id="reasons-for-the-current-implementation">
+<h2>Reasons for the current implementation<a class="headerlink" href="#reasons-for-the-current-implementation" title="Link to this heading"></a></h2>
+<p>The leader lock update failure could be caused by two main reasons:</p>
+<ol class="arabic simple">
+<li><p>Network partitioning</p></li>
+<li><p>DCS being down</p></li>
+</ol>
+<p>In general, it is impossible to distinguish between these two from a single node, and therefore Patroni assumes the worst case - network partitioning. In the case of a partitioned network, other nodes of the Patroni cluster may successfully grab the leader lock and promote Postgres to primary. In order to avoid a split-brain, the old primary is demoted before the leader lock expires.</p>
+</section>
+<section id="id2">
+<h2>DCS Failsafe Mode<a class="headerlink" href="#id2" title="Link to this heading"></a></h2>
+<p>We introduce a new special option, the <code class="docutils literal notranslate"><span class="pre">failsafe_mode</span></code>. It could be enabled only via global <a class="reference internal" href="dynamic_configuration.html#dynamic-configuration"><span class="std std-ref">dynamic configuration</span></a> stored in the DCS <code class="docutils literal notranslate"><span class="pre">/config</span></code> key. If the failsafe mode is enabled and the leader lock update in DCS failed due to reasons different from the version/value/index mismatch, Postgres may continue to run as a primary if it can access all known members of the cluster via Patroni REST API.</p>
+</section>
+<section id="low-level-implementation-details">
+<h2>Low-level implementation details<a class="headerlink" href="#low-level-implementation-details" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>We introduce a new, permanent key in DCS, named <code class="docutils literal notranslate"><span class="pre">/failsafe</span></code>.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">/failsafe</span></code> key contains all known members of the given Patroni cluster at a given time.</p></li>
+<li><p>The current leader maintains the <code class="docutils literal notranslate"><span class="pre">/failsafe</span></code> key.</p></li>
+<li><p>The member is allowed to participate in the leader race and become the new leader only if it is present in the <code class="docutils literal notranslate"><span class="pre">/failsafe</span></code> key.</p></li>
+<li><p>If the cluster consists of a single node the <code class="docutils literal notranslate"><span class="pre">/failsafe</span></code> key will contain a single member.</p></li>
+<li><p>In the case of DCS “outage” the existing primary connects to all members presented in the <code class="docutils literal notranslate"><span class="pre">/failsafe</span></code> key via the <code class="docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/failsafe</span></code> REST API and may continue to run as the primary if all replicas acknowledge it.</p></li>
+<li><p>If one of the members doesn’t respond, the primary is demoted.</p></li>
+<li><p>Replicas are using incoming <code class="docutils literal notranslate"><span class="pre">POST</span> <span class="pre">/failsafe</span></code> REST API requests as an indicator that the primary is still alive. This information is cached for <code class="docutils literal notranslate"><span class="pre">ttl</span></code> seconds.</p></li>
+</ul>
+</section>
+<section id="f-a-q">
+<h2>F.A.Q.<a class="headerlink" href="#f-a-q" title="Link to this heading"></a></h2>
+<ul>
+<li><p>Why MUST the current primary see ALL other members? Can’t we rely on quorum here?</p>
+<p>This is a great question! The problem is that the view on the quorum might be different from the perspective of DCS and Patroni. While DCS nodes must be evenly distributed across availability zones, there is no such rule for Patroni, and more importantly, there is no mechanism for introducing and enforcing such a rule. If the majority of Patroni nodes ends up in the losing part of the partitioned network (including primary) while minority nodes are in the winning part, the primary must be demoted. Only checking ALL other members allows detecting such a situation.</p>
+</li>
+<li><p>What if node/pod gets terminated while DCS is down?</p>
+<p>If DCS isn’t accessible, the check “are ALL other cluster members accessible?” is executed every cycle of the heartbeat loop (every <code class="docutils literal notranslate"><span class="pre">loop_wait</span></code> seconds). If pod/node is terminated, the check will fail and Postgres will be demoted to a read-only and will not recover until DCS is restored.</p>
+</li>
+<li><p>What if all members of the Patroni cluster are lost while DCS is down?</p>
+<p>Patroni could be configured to create the new replica from the backup even when the cluster doesn’t have a leader. But, if the new member isn’t present in the <code class="docutils literal notranslate"><span class="pre">/failsafe</span></code> key, it will not be able to grab the leader lock and promote.</p>
+</li>
+<li><p>What will happen if the primary lost access to DCS while replicas didn’t?</p>
+<p>The primary will execute the failsafe code and contact all known replicas. These replicas will use this information as an indicator that the primary is alive and will not start the leader race even if the leader lock in DCS has expired.</p>
+</li>
+<li><p>How to enable the Failsafe Mode?</p>
+<p>Before enabling the <code class="docutils literal notranslate"><span class="pre">failsafe_mode</span></code> please make sure that Patroni version on all members is up-to-date. After that, you can use either the <code class="docutils literal notranslate"><span class="pre">PATCH</span> <span class="pre">/config</span></code> <a class="reference internal" href="rest_api.html#rest-api"><span class="std std-ref">REST API</span></a> or <a class="reference internal" href="patronictl.html#patronictl-edit-config-parameters"><span class="std std-ref">patronictl edit-config -s failsafe_mode=true</span></a></p>
+</li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="pause.html" class="btn btn-neutral float-left" title="Pause/Resume mode for the cluster" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="kubernetes.html" class="btn btn-neutral float-right" title="Using Patroni with Kubernetes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025 Compose, Zalando SE, Patroni Contributors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

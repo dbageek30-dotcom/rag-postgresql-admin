@@ -1,0 +1,193 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Integration with other tools &mdash; Patroni 4.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/github_style.css?v=1093691d" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=977c162b" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=42d1b3bd"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Security Considerations" href="security.html" />
+    <link rel="prev" title="Convert a Standalone to a Patroni Cluster" href="existing_data.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Patroni
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="README.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="patroni_configuration.html">Patroni configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rest_api.html">Patroni REST API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="patronictl.html">patronictl</a></li>
+<li class="toctree-l1"><a class="reference internal" href="replica_bootstrap.html">Replica imaging and bootstrap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="replication_modes.html">Replication modes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="standby_cluster.html">Standby cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="watchdog.html">Watchdog support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pause.html">Pause/Resume mode for the cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dcs_failsafe_mode.html">DCS Failsafe Mode</a></li>
+<li class="toctree-l1"><a class="reference internal" href="kubernetes.html">Using Patroni with Kubernetes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="citus.html">Citus support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="existing_data.html">Convert a Standalone to a Patroni Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="existing_data.html#major-upgrade-of-postgresql-version">Major Upgrade of PostgreSQL Version</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Integration with other tools</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#barman">Barman</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#patroni-barman-recover">patroni_barman recover</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#patroni-barman-config-switch">patroni_barman config-switch</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security Considerations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ha_multi_dc.html">HA multi datacenter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Release notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributing</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Patroni</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Integration with other tools</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/patroni/patroni/blob/master/docs/tools_integration.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="integration-with-other-tools">
+<span id="tools-integration"></span><h1>Integration with other tools<a class="headerlink" href="#integration-with-other-tools" title="Link to this heading"></a></h1>
+<p>Patroni is able to integrate with other tools in your stack. In this section you
+will find a list of examples, which although not an exhaustive list, might
+provide you with ideas on how Patroni can integrate with other tools.</p>
+<section id="barman">
+<h2>Barman<a class="headerlink" href="#barman" title="Link to this heading"></a></h2>
+<p>Patroni delivers an application named <code class="docutils literal notranslate"><span class="pre">patroni_barman</span></code> which has logic to
+communicate with <code class="docutils literal notranslate"><span class="pre">pg-backup-api</span></code>, so you are able to perform Barman operations
+remotely.</p>
+<p>This application currently has a couple of sub-commands: <code class="docutils literal notranslate"><span class="pre">recover</span></code> and
+<code class="docutils literal notranslate"><span class="pre">config-switch</span></code>.</p>
+<section id="patroni-barman-recover">
+<h3>patroni_barman recover<a class="headerlink" href="#patroni-barman-recover" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">recover</span></code> sub-command can be used as a custom bootstrap or custom replica
+creation method. You can find more information about that in
+<a class="reference internal" href="replica_bootstrap.html#replica-imaging-and-bootstrap"><span class="std std-ref">Replica imaging and bootstrap</span></a>.</p>
+</section>
+<section id="patroni-barman-config-switch">
+<h3>patroni_barman config-switch<a class="headerlink" href="#patroni-barman-config-switch" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">config-switch</span></code> sub-command is designed to be used as an <code class="docutils literal notranslate"><span class="pre">on_role_change</span></code>
+callback in Patroni. As an example, assume you are streaming WALs from your
+current primary to your Barman host. In the event of a failover in the cluster
+you might want to start streaming WALs from the new primary. You can accomplish
+this by using <code class="docutils literal notranslate"><span class="pre">patroni_barman</span> <span class="pre">config-switch</span></code> as the <code class="docutils literal notranslate"><span class="pre">on_role_change</span></code> callback.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>That sub-command relies on the <code class="docutils literal notranslate"><span class="pre">barman</span> <span class="pre">config-switch</span></code> command, which is in
+charge of overriding the configuration of a Barman server by applying a
+pre-defined model on top of it. This command is available since Barman 3.10.
+Please consult the Barman documentation for more details.</p>
+</div>
+<p>This is an example of how you can configure Patroni to apply a configuration
+model in case this Patroni node is promoted to primary:</p>
+<div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">postgresql</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">callbacks</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">on_role_change</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;</span>
+<span class="w">            </span><span class="no">patroni_barman</span>
+<span class="w">                </span><span class="no">--api-url YOUR_API_URL</span>
+<span class="w">                </span><span class="no">config-switch</span>
+<span class="w">                </span><span class="no">--barman-server YOUR_BARMAN_SERVER_NAME</span>
+<span class="w">                </span><span class="no">--barman-model YOUR_BARMAN_MODEL_NAME</span>
+<span class="w">                </span><span class="no">--switch-when promoted</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">patroni_barman</span> <span class="pre">config-switch</span></code> requires that you have both Barman and
+<code class="docutils literal notranslate"><span class="pre">pg-backup-api</span></code> configured in the Barman host, so it can execute a remote
+<code class="docutils literal notranslate"><span class="pre">barman</span> <span class="pre">config-switch</span></code> through the backup API. Also, it requires that you
+have pre-configured Barman models to be applied. The above example uses a
+subset of the available parameters. You can get more information running
+<code class="docutils literal notranslate"><span class="pre">patroni_barman</span> <span class="pre">config-switch</span> <span class="pre">--help</span></code>, and by consulting the Barman
+documentation.</p>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="existing_data.html" class="btn btn-neutral float-left" title="Convert a Standalone to a Patroni Cluster" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="security.html" class="btn btn-neutral float-right" title="Security Considerations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025 Compose, Zalando SE, Patroni Contributors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,236 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Using Patroni with Kubernetes &mdash; Patroni 4.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/github_style.css?v=1093691d" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=977c162b" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=42d1b3bd"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Citus support" href="citus.html" />
+    <link rel="prev" title="DCS Failsafe Mode" href="dcs_failsafe_mode.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            Patroni
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="README.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="patroni_configuration.html">Patroni configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rest_api.html">Patroni REST API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="patronictl.html">patronictl</a></li>
+<li class="toctree-l1"><a class="reference internal" href="replica_bootstrap.html">Replica imaging and bootstrap</a></li>
+<li class="toctree-l1"><a class="reference internal" href="replication_modes.html">Replication modes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="standby_cluster.html">Standby cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="watchdog.html">Watchdog support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pause.html">Pause/Resume mode for the cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dcs_failsafe_mode.html">DCS Failsafe Mode</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Using Patroni with Kubernetes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#use-endpoints">Use Endpoints</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#use-configmaps">Use ConfigMaps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#configuration">Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#customize-role-label">Customize role label</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#examples">Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="citus.html">Citus support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="existing_data.html">Convert a Standalone to a Patroni Cluster</a></li>
+<li class="toctree-l1"><a class="reference internal" href="existing_data.html#major-upgrade-of-postgresql-version">Major Upgrade of PostgreSQL Version</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tools_integration.html">Integration with other tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security Considerations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ha_multi_dc.html">HA multi datacenter</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releases.html">Release notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributing</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">Patroni</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Using Patroni with Kubernetes</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/patroni/patroni/blob/master/docs/kubernetes.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="using-patroni-with-kubernetes">
+<span id="kubernetes"></span><h1>Using Patroni with Kubernetes<a class="headerlink" href="#using-patroni-with-kubernetes" title="Link to this heading"></a></h1>
+<p>Patroni can use Kubernetes objects in order to store the state of the cluster and manage the leader key. That makes it
+capable of operating Postgres in Kubernetes environment without any consistency store, namely, one doesn’t
+need to run an extra Etcd deployment. There are two different type of Kubernetes objects Patroni can use to store the
+leader and the configuration keys, they are configured with the <cite>kubernetes.use_endpoints</cite> or <cite>PATRONI_KUBERNETES_USE_ENDPOINTS</cite>
+environment variable.</p>
+<section id="use-endpoints">
+<h2>Use Endpoints<a class="headerlink" href="#use-endpoints" title="Link to this heading"></a></h2>
+<p>Despite the fact that this is the recommended mode, it is turned off by default for compatibility reasons. When it is on, Patroni stores
+the cluster configuration and the leader key in the <cite>metadata: annotations</cite> fields of the respective <cite>Endpoints</cite> it creates.
+Changing the leader is safer than when using <cite>ConfigMaps</cite>, since both the annotations, containing the leader information, and the actual addresses
+pointing to the running leader pod are updated simultaneously in one go.</p>
+</section>
+<section id="use-configmaps">
+<h2>Use ConfigMaps<a class="headerlink" href="#use-configmaps" title="Link to this heading"></a></h2>
+<p>In this mode, Patroni will create ConfigMaps instead of Endpoints and store keys inside meta-data of those ConfigMaps.
+Changing the leader takes at least two updates, one to the leader ConfigMap and another to the respective Endpoint.</p>
+<p>To direct the traffic to the Postgres leader you need to configure the Kubernetes Postgres service to use the label selector with the <cite>role_label</cite> (configured in patroni configuration).</p>
+<p>Note that in some cases, for instance, when running on OpenShift, there is no alternative to using ConfigMaps.</p>
+</section>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
+<p>Patroni Kubernetes <a class="reference internal" href="yaml_configuration.html#kubernetes-settings"><span class="std std-ref">settings</span></a> and <a class="reference internal" href="ENVIRONMENT.html#kubernetes-environment"><span class="std std-ref">environment variables</span></a> are described in the general chapters of the documentation.</p>
+<section id="customize-role-label">
+<span id="kubernetes-role-values"></span><h3>Customize role label<a class="headerlink" href="#customize-role-label" title="Link to this heading"></a></h3>
+<p>By default, Patroni will set corresponding labels on the pod it runs in based on node’s role, such as <code class="docutils literal notranslate"><span class="pre">role=primary</span></code>.
+The key and value of label can be customized by <cite>kubernetes.role_label</cite>, <cite>kubernetes.leader_label_value</cite>, <cite>kubernetes.follower_label_value</cite> and <cite>kubernetes.standby_leader_label_value</cite>.</p>
+<p>Note that if you migrate from default role labels to custom ones, you can reduce downtime by following migration steps:</p>
+<ol class="arabic simple">
+<li><p>Add a temporary label using original role value for the pod with <cite>kubernetes.tmp_role_label</cite> (like <code class="docutils literal notranslate"><span class="pre">tmp_role</span></code>). Once pods are restarted they will get following labels set by Patroni:</p></li>
+</ol>
+<blockquote>
+<div><div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">cluster-name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="w">  </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">primary</span>
+<span class="w">  </span><span class="nt">tmp_role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">primary</span>
+</pre></div>
+</div>
+</div></blockquote>
+<ol class="arabic simple" start="2">
+<li><p>After all pods have been updated, modify the service selector to select the temporary label.</p></li>
+</ol>
+<blockquote>
+<div><div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">selector</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">cluster-name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="w">  </span><span class="nt">tmp_role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">primary</span>
+</pre></div>
+</div>
+</div></blockquote>
+<ol class="arabic simple" start="3">
+<li><p>Add your custom role label (e.g., set <cite>kubernetes.leader_label_value=primary</cite>). Once pods are restarted they will get following new labels set by Patroni:</p></li>
+</ol>
+<blockquote>
+<div><div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">cluster-name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="w">  </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">primary</span>
+<span class="w">  </span><span class="nt">tmp_role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">primary</span>
+</pre></div>
+</div>
+</div></blockquote>
+<ol class="arabic simple" start="4">
+<li><p>After all pods have been updated again, modify the service selector to use new role value.</p></li>
+</ol>
+<blockquote>
+<div><div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">selector</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">cluster-name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="w">  </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">primary</span>
+</pre></div>
+</div>
+</div></blockquote>
+<ol class="arabic simple" start="5">
+<li><p>Finally, remove the temporary label from your configuration and update all pods.</p></li>
+</ol>
+<blockquote>
+<div><div class="highlight-YAML notranslate"><div class="highlight"><pre><span></span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">cluster-name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo</span>
+<span class="w">  </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">primary</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+</section>
+<section id="examples">
+<h2>Examples<a class="headerlink" href="#examples" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>The <a class="reference external" href="https://github.com/patroni/patroni/tree/master/kubernetes">kubernetes</a> folder of the Patroni repository contains
+examples of the Docker image, and the Kubernetes manifest to test Patroni Kubernetes setup.
+Note that in the current state it will not be able to use PersistentVolumes because of permission issues.</p></li>
+<li><p>You can find the full-featured Docker image that can use Persistent Volumes in the
+<a class="reference external" href="https://github.com/zalando/spilo">Spilo Project</a>.</p></li>
+<li><p>There is also a <a class="reference external" href="https://github.com/kubernetes/charts/tree/master/incubator/patroni">Helm chart</a>
+to deploy the Spilo image configured with Patroni running using Kubernetes.</p></li>
+<li><p>In order to run your database clusters at scale using Patroni and Spilo, take a look at the
+<a class="reference external" href="https://github.com/zalando/postgres-operator">postgres-operator</a> project. It implements the operator pattern
+to manage Spilo clusters.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="dcs_failsafe_mode.html" class="btn btn-neutral float-left" title="DCS Failsafe Mode" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="citus.html" class="btn btn-neutral float-right" title="Citus support" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025 Compose, Zalando SE, Patroni Contributors.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

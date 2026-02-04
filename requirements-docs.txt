@@ -1,0 +1,9 @@
+# Dependencies required only for building documentation (Patroni, pgBackRest, repmgr)
+
+sphinx
+sphinx_rtd_theme
+sphinx-github-style
+sphinxcontrib-apidoc
+sphinxcontrib-httpdomain
+sphinxcontrib-programoutput
+
