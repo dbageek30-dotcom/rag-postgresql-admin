@@ -1,34 +1,57 @@
 from sentence_transformers import SentenceTransformer
-from .db import get_connection
+from .db import conn
 
-model = SentenceTransformer("BAAI/bge-base-en-v1.5")
+# Modèle d'embedding
+embedder = SentenceTransformer("BAAI/bge-base-en-v1.5")
 
-def rag_query(question, top_k=5):
-    emb = model.encode(question).tolist()
+def rag_query(query: str, source: str = None, version: str = None):
+    # Génération de l'embedding
+    embedding = embedder.encode(query).tolist()
 
-    # Convertit en format pgvector
-    vec = "[" + ",".join(str(x) for x in emb) + "]"
+    # Conversion en format pgvector : "[0.12,-0.03,...]"
+    vector_str = "[" + ",".join(str(x) for x in embedding) + "]"
 
-    conn = get_connection()
-    cur = conn.cursor()
+    # Construction dynamique du WHERE
+    where_clauses = []
+    params = []
 
-    cur.execute("""
-        SELECT content, metadata, embedding <=> %s::vector AS distance
+    if source:
+        where_clauses.append("source = %s")
+        params.append(source)
+
+    if version:
+        where_clauses.append("version = %s")
+        params.append(version)
+
+    where_sql = ""
+    if where_clauses:
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+
+    # Requête SQL avec cast explicite ::vector
+    sql = f"""
+        SELECT content, metadata, embedding
         FROM documents
-        ORDER BY embedding <=> %s::vector
-        LIMIT %s;
-    """, (vec, vec, top_k))
+        {where_sql}
+        ORDER BY embedding <-> %s::vector
+        LIMIT 5;
+    """
 
+    # Ajout de l'embedding converti
+    params.append(vector_str)
+
+    # Exécution
+    cur = conn.cursor()
+    cur.execute(sql, params)
     rows = cur.fetchall()
     cur.close()
-    conn.close()
 
-    return [
-        {
-            "content": r[0],
-            "metadata": r[1],
-            "distance": float(r[2])
-        }
-        for r in rows
-    ]
+    # Formatage du résultat
+    results = []
+    for content, metadata, emb in rows:
+        results.append({
+            "content": content,
+            "metadata": metadata
+        })
+
+    return {"query": query, "results": results}
 
