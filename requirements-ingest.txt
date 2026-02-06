@@ -1,0 +1,7 @@
+beautifulsoup4
+lxml
+html5lib
+tqdm
+requests
+python-slugify
+

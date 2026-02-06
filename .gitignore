@@ -3,3 +3,21 @@ pgvenv/
 __pycache__/
 *.pyc
 
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environnements virtuels
+venv/
+pgvenv/
+.env/
+
+# Fichiers temporaires
+*.log
+*.tmp
+*.swp
+
+# Cache HuggingFace
+~/.cache/huggingface/
+
