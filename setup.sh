@@ -7,7 +7,9 @@ echo "=== Installation du pipeline RAG PostgreSQL ==="
 # 1. Installation des dépendances Python
 # ------------------------------------------------------------------------------
 echo ">>> Installation des dépendances Python"
-pip3 install -r requirements.txt
+pip3 install torch==2.2.2+cpu --index-url https://download.pytorch.org/whl/cpu
+
+pip3 install -r requirements.txt --no-cache-dir
 
 # ------------------------------------------------------------------------------
 # 2. Installation PostgreSQL + pgvector
