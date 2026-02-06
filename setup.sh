@@ -4,11 +4,21 @@ set -e
 echo "=== Installation du pipeline RAG PostgreSQL ==="
 
 # ------------------------------------------------------------------------------
+# 0. Pré-requis Python (pip, venv)
+# ------------------------------------------------------------------------------
+echo ">>> Installation des prérequis Python"
+sudo apt update
+sudo apt install -y python3-pip python3-venv python3.12-venv
+
+# ------------------------------------------------------------------------------
 # 1. Installation des dépendances Python
 # ------------------------------------------------------------------------------
-echo ">>> Installation des dépendances Python"
-pip3 install torch==2.2.2+cpu --index-url https://download.pytorch.org/whl/cpu
+echo ">>> Installation de torch CPU"
+pip3 install torch==2.2.2+cpu \
+  --index-url https://download.pytorch.org/whl/cpu \
+  --extra-index-url https://pypi.org/simple
 
+echo ">>> Installation des requirements"
 pip3 install -r requirements.txt --no-cache-dir
 
 # ------------------------------------------------------------------------------
@@ -16,13 +26,15 @@ pip3 install -r requirements.txt --no-cache-dir
 # ------------------------------------------------------------------------------
 echo ">>> Installation PostgreSQL + pgvector"
 
-if [ ! -f /usr/share/keyrings/postgresql.gpg ]; then
+# Ajouter la source PostgreSQL uniquement si elle n'existe pas
+if [ ! -f /etc/apt/sources.list.d/pgdg.list ]; then
+    echo ">>> Ajout du dépôt PostgreSQL"
     curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
         | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
-fi
 
-echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
-    | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+    echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+        | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+fi
 
 sudo apt update
 sudo apt install -y postgresql-18 postgresql-18-pgvector postgresql-contrib-18
@@ -40,8 +52,6 @@ fi
 # 4. Demande des informations utilisateur
 # ------------------------------------------------------------------------------
 read -p "Nom de l'utilisateur PostgreSQL (ex: rag_user) : " RAG_USER
-read -s -p "Mot de passe pour ${RAG_USER} : " RAG_PASSWORD
-echo ""
 
 # ------------------------------------------------------------------------------
 # 5. Création base rag
@@ -52,20 +62,20 @@ if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='rag'" 
 fi
 
 # ------------------------------------------------------------------------------
-# 6. Création utilisateur
+# 6. Création utilisateur (idempotent)
 # ------------------------------------------------------------------------------
-echo ">>> Création de l'utilisateur ${RAG_USER}"
-sudo -u postgres psql <<EOF
-DO \$\$
-BEGIN
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${RAG_USER}') THEN
-        EXECUTE format('DROP ROLE %I', '${RAG_USER}');
-    END IF;
-END
-\$\$;
-EOF
+echo ">>> Vérification de l'utilisateur PostgreSQL ${RAG_USER}"
 
-sudo -u postgres psql -c "CREATE USER ${RAG_USER} WITH PASSWORD '${RAG_PASSWORD}'"
+USER_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${RAG_USER}'")
+
+if [ "$USER_EXISTS" = "1" ]; then
+    echo ">>> L'utilisateur ${RAG_USER} existe déjà. Aucune création ni mot de passe demandé."
+else
+    echo ">>> L'utilisateur ${RAG_USER} n'existe pas. Création..."
+    read -s -p "Mot de passe pour ${RAG_USER} : " RAG_PASSWORD
+    echo ""
+    sudo -u postgres psql -c "CREATE USER ${RAG_USER} WITH PASSWORD '${RAG_PASSWORD}'"
+fi
 
 # ------------------------------------------------------------------------------
 # 7. Création table documents
@@ -130,7 +140,11 @@ esac
 # ------------------------------------------------------------------------------
 echo ">>> Génération du fichier .env"
 
+BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 cat > .env <<EOF
+BASE_DIR=${BASE_DIR}
+
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=rag
