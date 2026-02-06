@@ -1,23 +1,51 @@
+# ============================
+# Environment files
+# ============================
 .env
-pgvenv/
-__pycache__/
-*.pyc
+.env.*
 
+# ============================
+# Virtual environments
+# ============================
+venv/
+pgvenv/
+
+# ============================
+# Python cache
+# ============================
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# Environnements virtuels
-venv/
-pgvenv/
-.env/
-
-# Fichiers temporaires
+# ============================
+# Logs & temp files
+# ============================
 *.log
 *.tmp
 *.swp
 
-# Cache HuggingFace
-~/.cache/huggingface/
+# ============================
+# HuggingFace cache (local)
+# ============================
+.cache/
+huggingface/
+
+# ============================
+# Old API folder (removed)
+# ============================
+api/
+
+# ============================
+# Data & generated files
+# ============================
+data/
+*.db
+*.sqlite
+
+# ============================
+# Editor / OS files
+# ============================
+.DS_Store
+Thumbs.db
 

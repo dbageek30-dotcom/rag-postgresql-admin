@@ -3,11 +3,12 @@ import sys
 import json
 import textwrap
 import psycopg2
-import requests
 import os
 
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer, CrossEncoder
+
+from llm_providers import call_llm
 
 # =========================
 #  Charger la configuration
@@ -27,9 +28,16 @@ PG_CONN_INFO = {
     "password": os.getenv("DB_PASSWORD", "")
 }
 
-# LLM
-LLM_URL = os.getenv("LLM_URL", "")
-LLM_MODEL = os.getenv("LLM_MODEL", "")
+# LLM Provider
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "none").lower()
+
+# Provider-specific config
+LLM_CONFIG = {
+    "model": os.getenv("LLM_MODEL", ""),
+    "url": os.getenv("LLM_URL", ""),
+    "api_key": os.getenv("OPENAI_API_KEY") or os.getenv("HF_API_KEY") or os.getenv("GEMINI_API_KEY"),
+    "base_url": os.getenv("OPENAI_API_BASE")
+}
 
 # =========================
 #  Charger les modèles
@@ -63,10 +71,10 @@ def fetch_candidates(question: str, top_k: int = 30, source: str = None):
                 metadata->>'title'   AS title,
                 metadata->>'html_id' AS html_id,
                 content,
-                embedding <-> %s::vector AS distance
+                embedding <=> %s::vector AS distance
             FROM documents
             WHERE source = %s
-            ORDER BY embedding <-> %s::vector
+            ORDER BY embedding <=> %s::vector
             LIMIT %s;
         """
         cur.execute(query, (emb, source, emb, top_k))
@@ -76,9 +84,9 @@ def fetch_candidates(question: str, top_k: int = 30, source: str = None):
                 metadata->>'title'   AS title,
                 metadata->>'html_id' AS html_id,
                 content,
-                embedding <-> %s::vector AS distance
+                embedding <=> %s::vector AS distance
             FROM documents
-            ORDER BY embedding <-> %s::vector
+            ORDER BY embedding <=> %s::vector
             LIMIT %s;
         """
         cur.execute(query, (emb, emb, top_k))
@@ -117,52 +125,6 @@ def build_context(reranked_rows):
 
 
 # =========================
-#  Appel LLM
-# =========================
-def call_llm(question: str, context: str) -> str:
-    if not LLM_URL or not LLM_MODEL:
-        return None  # mode NO LLM automatique
-
-    system_prompt = (
-        "You are a PostgreSQL server administration assistant. "
-        "Answer ONLY using the documentation context provided. "
-        "If the answer is not in the context, say exactly: "
-        "\"The documentation does not contain this information.\""
-    )
-
-    payload = {
-        "model": LLM_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": (
-                    "Here is the documentation context:\n\n"
-                    f"{context}\n\n"
-                    f"Question: {question}"
-                ),
-            },
-        ],
-        "stream": False,
-    }
-
-    try:
-        resp = requests.post(LLM_URL, json=payload, timeout=600)
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as e:
-        print(f"[NO LLM] Impossible d'appeler le LLM : {e}")
-        return None
-
-    if isinstance(data, dict) and "message" in data:
-        return data["message"]["content"]
-    elif isinstance(data, dict) and "choices" in data:
-        return data["choices"][0]["message"]["content"]
-    else:
-        return str(data)
-
-
-# =========================
 #  Fonction API-friendly
 # =========================
 def ask_pg(question: str, no_llm: bool = False, source: str = None) -> str:
@@ -174,14 +136,14 @@ def ask_pg(question: str, no_llm: bool = False, source: str = None) -> str:
 
     context = build_context(top_rows)
 
-    if no_llm:
+    if no_llm or LLM_PROVIDER == "none":
         return (
             "=== CONTEXTE ===\n\n"
             + context
-            + "\n\n[NO LLM] Mode forcé (--no-llm). Aucun appel LLM effectué."
+            + "\n\n[NO LLM] Aucun LLM utilisé."
         )
 
-    answer = call_llm(question, context)
+    answer = call_llm(LLM_PROVIDER, question, context, LLM_CONFIG)
 
     if answer is None:
         return (
