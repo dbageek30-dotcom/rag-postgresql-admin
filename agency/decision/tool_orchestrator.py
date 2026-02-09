@@ -1,9 +1,11 @@
+import os
+from dotenv import load_dotenv
+
 from agency.agents.toolsmith_pgbackrest import ToolsmithPgBackRest
 from agency.agents.toolsmith_agent import ToolsmithAgent  # PostgreSQL
 
-# RAG hybride
 from agency.rag.rag_hybrid import RAGHybrid
-from agency.llm.gemini_client import GeminiClient
+from agency.llm.ollama_client import OllamaClient
 
 
 class ToolOrchestrator:
@@ -12,17 +14,31 @@ class ToolOrchestrator:
     Reçoit une décision du Decision Layer et exécute l’action appropriée.
     """
 
+    def __init__(self):
+        # Charger les variables d’environnement
+        load_dotenv()
+
+        self.db_params = {
+            "dbname": os.getenv("DB_NAME"),
+            "user": os.getenv("DB_USER"),
+            "password": os.getenv("DB_PASSWORD"),
+            "host": os.getenv("DB_HOST"),
+            "port": os.getenv("DB_PORT"),
+        }
+
     def execute(self, decision: dict):
         action = decision.get("action")
         args = decision.get("arguments", {})
-        query = decision.get("query", "")  # important pour le RAG
+        query = decision.get("query", "")
 
         # ------------------------------------------------------------------
         # 1. pgBackRest
         # ------------------------------------------------------------------
         if action == "tool:pgbackrest":
             toolsmith = ToolsmithPgBackRest()
-            result = toolsmith.generate_tool_for_command(args.get("command", "info"))
+            result = toolsmith.generate_tool_for_command(
+                args.get("command", "info")
+            )
 
             namespace = {}
             exec(result["code"], namespace)
@@ -37,7 +53,9 @@ class ToolOrchestrator:
         # ------------------------------------------------------------------
         if action == "tool:postgresql":
             toolsmith = ToolsmithAgent()
-            result = toolsmith.generate_tool_for_command(args.get("command", ""))
+            result = toolsmith.generate_tool_for_command(
+                args.get("command", "")
+            )
 
             namespace = {}
             exec(result["code"], namespace)
@@ -60,19 +78,12 @@ class ToolOrchestrator:
         # 4. RAG documentaire (hybride)
         # ------------------------------------------------------------------
         if action == "rag:doc":
-            # Initialisation du RAG hybride
-            rag = RAGHybrid({
-                "dbname": "rag",
-                "user": "rag_user",
-                "password": "rag_password",
-                "host": "localhost"
-            })
+            rag = RAGHybrid(self.db_params)
 
-            # Embedding de la requête
-            llm = GeminiClient()
+            # Embedding via Ollama
+            llm = OllamaClient()
             query_embedding = llm.embed(query=query)
 
-            # Exécution du pipeline RAG hybride
             return rag.query(query, query_embedding)
 
         # ------------------------------------------------------------------
