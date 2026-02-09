@@ -5,13 +5,9 @@ from agency.db.connection import conn
 embedder = EmbeddingSingleton.get_model()
 
 def rag_query(query: str, source: str = None, version: str = None):
-    # Génération de l'embedding via le singleton
     embedding = embedder.encode(query).tolist()
-
-    # Conversion en format pgvector : "[0.12,-0.03,...]"
     vector_str = "[" + ",".join(str(x) for x in embedding) + "]"
 
-    # Construction dynamique du WHERE
     where_clauses = []
     params = []
 
@@ -27,7 +23,6 @@ def rag_query(query: str, source: str = None, version: str = None):
     if where_clauses:
         where_sql = "WHERE " + " AND ".join(where_clauses)
 
-    # Requête SQL avec cast explicite ::vector
     sql = f"""
         SELECT content, metadata, embedding
         FROM documents
@@ -36,16 +31,13 @@ def rag_query(query: str, source: str = None, version: str = None):
         LIMIT 5;
     """
 
-    # Ajout de l'embedding converti
     params.append(vector_str)
 
-    # Exécution
     cur = conn.cursor()
     cur.execute(sql, params)
     rows = cur.fetchall()
     cur.close()
 
-    # Formatage du résultat
     results = []
     for content, metadata, emb in rows:
         results.append({

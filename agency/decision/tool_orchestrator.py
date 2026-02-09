@@ -51,6 +51,9 @@ class ToolOrchestrator:
             "pgbackrest": PgBackRestWorker(),
         }
 
+        # LLM instancié UNE SEULE FOIS
+        self.llm = OllamaClient()
+
     def execute(self, decision: dict):
         action = decision.get("action")
         payload = decision.get("payload", "")
@@ -92,8 +95,7 @@ class ToolOrchestrator:
         # ------------------------------------------------------------
         if action == "rag:doc":
             rag = RAGHybrid(self.db_params)
-            llm = OllamaClient()
-            query_embedding = llm.embed(query=payload)
+            query_embedding = self.llm.embed(query=payload)
             return rag.query(payload, query_embedding)
 
         # ------------------------------------------------------------
