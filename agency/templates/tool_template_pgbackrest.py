@@ -1,14 +1,7 @@
 TOOL_TEMPLATE_PGBACKREST = """
-import subprocess
-
-
 class {class_name}:
     \"""
     Tool pgBackRest généré dynamiquement.
-
-    - Exécute la commande pgBackRest '{command}'
-    - Utilise SSH pour atteindre la VM distante
-    - Supporte des options passées via **options
     \"""
 
     def __init__(self, ssh_host, ssh_user, ssh_key, pgbackrest_bin, **options):
@@ -20,8 +13,6 @@ class {class_name}:
 
     def _build_command(self):
         base_cmd = [self.pgbackrest_bin, "{command}"]
-
-        # Construction des options CLI à partir de self.options
         for key, value in self.options.items():
             cli_opt = f"--{{key.replace('_', '-')}}"
             if isinstance(value, bool):
@@ -36,12 +27,13 @@ class {class_name}:
             f"{{self.ssh_user}}@{{self.ssh_host}}",
             " ".join(base_cmd)
         ]
-
         return ssh_cmd
 
     def run(self):
+        # Import inside the method to avoid scope issues during dynamic execution
+        import subprocess
+        
         cmd = self._build_command()
-
         result = subprocess.run(cmd, capture_output=True, text=True)
 
         return {{
@@ -51,4 +43,3 @@ class {class_name}:
             "returncode": result.returncode,
         }}
 """
-

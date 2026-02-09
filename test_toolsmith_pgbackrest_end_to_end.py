@@ -24,7 +24,7 @@ def main():
     tool_params = {
         "ssh_host": "10.210.0.2",
         "ssh_user": "postgres",
-        "ssh_key": "/home/postgres/.ssh/id_rsa",  # adapte si nécessaire
+        "ssh_key": "/var/lib/postgresql/.ssh/id_ed25519",  # adapte si nécessaire
         "pgbackrest_bin": "/usr/bin/pgbackrest",
         # Exemple d’options (si la commande en a)
         # "stanza": "pg_data"
