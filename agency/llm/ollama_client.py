@@ -1,13 +1,23 @@
+import os
 import requests
 import json
 import numpy as np
 
+# Désactiver les logs HF / Transformers
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"]
+
+from sentence_transformers import SentenceTransformer
+
 OLLAMA_BASE_URL = "http://10.214.0.8:11434"
 LLM_MODEL = "qwen2.5:7b-instruct-q4_K_M"
-EMBED_MODEL = "bge-base-en-v1.5"
+EMBED_MODEL = "BAAI/bge-base-en-v1.5"
 
 
 class OllamaClient:
+    def __init__(self):
+        self.embedding_model = SentenceTransformer(EMBED_MODEL)
+
     def generate(self, prompt: str) -> str:
         url = f"{OLLAMA_BASE_URL}/api/generate"
         payload = {"model": LLM_MODEL, "prompt": prompt, "stream": True}
@@ -33,18 +43,8 @@ class OllamaClient:
         return full_text.strip()
 
     def embed(self, query: str):
-        url = f"{OLLAMA_BASE_URL}/api/embeddings"
-        payload = {"model": EMBED_MODEL, "prompt": query}
-
-        response = requests.post(url, json=payload, timeout=60)
-        response.raise_for_status()
-
-        data = response.json()
-        embedding = data.get("embedding")
-        if embedding is None:
-            raise ValueError("Embedding non trouvé dans la réponse Ollama")
-
-        return np.array(embedding, dtype=float)
+        vector = self.embedding_model.encode(query)
+        return vector.tolist()
 
 
 def llm_query(prompt: str) -> str:
