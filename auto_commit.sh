@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd /home/postgres/rag-postgresql-admin
+cd /var/lib/postgresql/rag-postgresql-admin
 
 # Ajouter tous les fichiers modifiés et nouveaux
 git add -A
