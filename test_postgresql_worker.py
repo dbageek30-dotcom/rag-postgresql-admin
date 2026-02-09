@@ -1,26 +1,26 @@
 from agency.workers.postgresql_worker import PostgreSQLWorker
 from agency.agents.toolsmith_postgresql import ToolsmithPostgreSQL
+import os
+from dotenv import load_dotenv
 import psycopg2
+
+load_dotenv()
 
 def get_connection():
     return psycopg2.connect(
-        dbname="rag",
-        user="rag_user",
-        password="rag_pass",
-        host="127.0.0.1",
-        port=5432
+        dbname=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        host=os.getenv("DB_HOST"),
+        port=int(os.getenv("DB_PORT")),
     )
 
 def main():
     print("\n=== TEST WORKER POSTGRESQL ===")
 
-    # 1. Connexion DB
     conn = get_connection()
-
-    # 2. Toolsmith PostgreSQL
     toolsmith = ToolsmithPostgreSQL()
 
-    # 3. Génération d’un tool pour pg_stat_activity
     tool_info = toolsmith.generate_tool_for_view(
         view_name="pg_stat_activity",
         version="17",
@@ -31,16 +31,14 @@ def main():
     print("Class:", tool_info["class_name"])
     print("Columns:", tool_info["columns"])
 
-    # 4. Instruction envoyée au worker
     instruction = {
         "endpoint": "/sql",
         "task": "execute_tool",
         "tool_class": tool_info["class_name"],
         "tool_code": tool_info["code"],
-        "payload": { "limit": 5 }
+        "payload": {"limit": 5},
     }
 
-    # 5. Worker PostgreSQL
     worker = PostgreSQLWorker(conn)
     result = worker.execute(instruction)
 
