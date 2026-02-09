@@ -105,4 +105,55 @@ Output one column name per line, no explanation.
         rows = cur.fetchall()
         cur.close()
         return [r[0] for r in rows]
+        def generate_tool_for_command(self, sql_query: str):
+        """
+        API unifiée avec pgBackRest :
+        Génère un tool Python dynamique qui exécute une requête SQL arbitraire.
+        """
+
+        class_name = "PostgreSQLDynamicQueryTool"
+
+        code = f"""
+class {class_name}:
+    \"""
+    Tool PostgreSQL dynamique généré automatiquement.
+    Exécute une requête SQL arbitraire.
+    \"""
+
+    def __init__(self, dbname, user, password, host, port):
+        self.dbname = dbname
+        self.user = user
+        self.password = password
+        self.host = host
+        self.port = port
+
+    def run(self, args=None):
+        import psycopg2
+        conn = psycopg2.connect(
+            dbname=self.dbname,
+            user=self.user,
+            password=self.password,
+            host=self.host,
+            port=self.port
+        )
+        cur = conn.cursor()
+        cur.execute(\"\"\"{sql_query}\"\"\")
+        try:
+            rows = cur.fetchall()
+        except:
+            rows = []
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return {{
+            "query": \"\"\"{sql_query}\"\"\",
+            "rows": rows
+        }}
+"""
+
+        return {
+            "class_name": class_name,
+            "code": code
+        }
 
