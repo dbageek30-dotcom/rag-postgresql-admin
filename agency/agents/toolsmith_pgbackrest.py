@@ -15,42 +15,58 @@ class ToolsmithPgBackRest:
         self.rag = rag_client or rag_query
         self.llm = llm_client or OllamaClient()
 
-    def generate_tool_for_command(self, command_name: str, version: str = "latest"):
+    def _extract_options_from_doc(self, command_name: str, version: str):
         """
-        Génère un tool dynamique pour une commande pgBackRest.
+        Utilise RAG + LLM pour extraire les options CLI d'une commande pgBackRest.
+        Retourne une liste de noms d'options (sans --).
         """
-        # 1. Récupérer la doc via RAG
         question = (
-            f"Explain the pgBackRest command '{command_name}' "
-            f"and list all its CLI options. "
-            f"Output only the option names, one per line."
+            f"In the pgBackRest documentation (version {version}), "
+            f"list all CLI options for the command '{command_name}'. "
+            f"Output only the option names, one per line, without descriptions."
         )
 
         rag_result = self.rag(question, source="pgbackrest", version=version)
-        raw_text = "\n".join(r["content"] for r in rag_result["results"])
+        raw_text = "\n".join(r["content"] for r in rag_result.get("results", []))
 
         if not raw_text.strip():
-            options = []
-        else:
-            # 2. Extraction stricte via LLM (OllamaClient)
-            prompt = f"""
-Here is documentation text about the pgBackRest command '{command_name}':
+            return []
+
+        prompt = f"""
+You are an expert in pgBackRest.
+
+From the following documentation extract ONLY the CLI option names
+for the command '{command_name}'.
+
+Output:
+- one option per line
+- without descriptions
+- without leading '--'
+- no extra text.
+
+Documentation:
 
 {raw_text}
-
-Extract ONLY the option names (without descriptions).
-Output one option name per line, no explanation.
 """
 
-            llm_output = self.llm.generate(prompt)
+        llm_output = self.llm.generate(prompt)
 
-            options = []
-            for line in llm_output.splitlines():
-                line = line.strip().lstrip("-")
-                if line:
-                    options.append(line)
+        options = []
+        for line in llm_output.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            line = line.lstrip("-")
+            if line:
+                options.append(line)
+        return sorted(set(options))
 
-        # 3. Génération du code du tool
+    def generate_tool_for_command(self, command_name: str, version: str = "2.58.0"):
+        """
+        Génère un tool dynamique pour une commande pgBackRest.
+        """
+        options = self._extract_options_from_doc(command_name, version)
+
         class_name = f"PgBackRest{command_name.title().replace('-', '').replace('_', '')}Tool"
 
         tool_code = TOOL_TEMPLATE_PGBACKREST.format(

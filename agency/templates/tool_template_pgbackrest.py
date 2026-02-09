@@ -1,46 +1,54 @@
 TOOL_TEMPLATE_PGBACKREST = """
+import subprocess
+
+
 class {class_name}:
-    def __init__(self, host="10.210.0.2", user="postgres", dry_run=False):
-        self.host = host
-        self.user = user
-        self.dry_run = dry_run
+    \"""
+    Tool pgBackRest généré dynamiquement.
 
-    def run(self, args=None):
-        import subprocess, json
+    - Exécute la commande pgBackRest '{command}'
+    - Utilise SSH pour atteindre la VM distante
+    - Supporte des options passées via **options
+    \"""
 
-        base_cmd = ["pgbackrest", "{command}"]
+    def __init__(self, ssh_host, ssh_user, ssh_key, pgbackrest_bin, **options):
+        self.ssh_host = ssh_host
+        self.ssh_user = ssh_user
+        self.ssh_key = ssh_key
+        self.pgbackrest_bin = pgbackrest_bin
+        self.options = options
 
-        if args:
-            for k, v in args.items():
-                if isinstance(v, bool):
-                    if v:
-                        # On veut que le code généré soit : f"--{{k}}"
-                        base_cmd.append(f"--{{k}}")
-                else:
-                    # On veut que le code généré soit : f"--{{k}}={{v}}"
-                    base_cmd.append(f"--{{k}}={{v}}")
+    def _build_command(self):
+        base_cmd = [self.pgbackrest_bin, "{command}"]
 
-        # Ici, on veut que le code final contienne de vraies f-strings exploitables
-        ssh_cmd = ["ssh", f"{{self.user}}@{{self.host}}"] + base_cmd
+        # Construction des options CLI à partir de self.options
+        for key, value in self.options.items():
+            cli_opt = f"--{{key.replace('_', '-')}}"
+            if isinstance(value, bool):
+                if value:
+                    base_cmd.append(cli_opt)
+            elif value is not None:
+                base_cmd.extend([cli_opt, str(value)])
 
-        if self.dry_run:
-            return {{
-                "command": " ".join(ssh_cmd),
-                "stdout": "(dry-run) pgBackRest not executed",
-                "stderr": "",
-                "returncode": 0
-            }}
+        ssh_cmd = [
+            "ssh",
+            "-i", self.ssh_key,
+            f"{{self.ssh_user}}@{{self.ssh_host}}",
+            " ".join(base_cmd)
+        ]
 
-        result = subprocess.run(
-            ssh_cmd,
-            capture_output=True,
-            text=True
-        )
+        return ssh_cmd
+
+    def run(self):
+        cmd = self._build_command()
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
 
         return {{
-            "command": " ".join(ssh_cmd),
-            "stdout": result.stdout.strip(),
-            "stderr": result.stderr.strip(),
-            "returncode": result.returncode
+            "command": " ".join(cmd),
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "returncode": result.returncode,
         }}
 """
+
