@@ -1,5 +1,8 @@
 import psycopg2
 import os
+from dotenv import load_dotenv
+load_dotenv()
+
 
 # Variables d'environnement pour la base locale (RAG)
 DB_NAME = os.getenv("DB_NAME", "rag")
