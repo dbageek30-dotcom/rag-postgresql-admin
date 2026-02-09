@@ -1,24 +1,11 @@
 from agency.workers.postgresql_worker import PostgreSQLWorker
 from agency.agents.toolsmith_postgresql import ToolsmithPostgreSQL
-import os
-from dotenv import load_dotenv
-import psycopg2
-
-load_dotenv()
-
-def get_connection():
-    return psycopg2.connect(
-        dbname=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-        host=os.getenv("DB_HOST"),
-        port=int(os.getenv("DB_PORT")),
-    )
+from agency.db.connection import get_remote_connection
 
 def main():
-    print("\n=== TEST WORKER POSTGRESQL ===")
+    print("\n=== TEST WORKER POSTGRESQL (REMOTE DB) ===")
 
-    conn = get_connection()
+    conn = get_remote_connection()
     toolsmith = ToolsmithPostgreSQL()
 
     tool_info = toolsmith.generate_tool_for_view(
