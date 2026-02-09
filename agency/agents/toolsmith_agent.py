@@ -13,6 +13,9 @@ class ToolsmithAgent:
         self.rag = rag_client or rag_query
         self.llm = llm_client or llm_query
 
+    # ----------------------------------------------------------------------
+    # 1. Génération de tools pour les vues PostgreSQL
+    # ----------------------------------------------------------------------
     def generate_tool_for_view(self, view_name: str, version: str, conn=None):
         """
         Génère un tool dynamique pour une vue PostgreSQL.
@@ -52,6 +55,9 @@ class ToolsmithAgent:
             "code": tool_code,
         }
 
+    # ----------------------------------------------------------------------
+    # 2. Extraction des colonnes depuis la documentation
+    # ----------------------------------------------------------------------
     def _get_columns_from_doc(self, view_name: str, version: str):
         """
         Utilise le RAG + LLM local (Qwen via Ollama) pour extraire les colonnes de la vue.
@@ -88,6 +94,9 @@ Output one column name per line, no explanation.
 
         return cols
 
+    # ----------------------------------------------------------------------
+    # 3. Extraction des colonnes depuis la base
+    # ----------------------------------------------------------------------
     def _get_columns_from_db(self, conn, view_name: str):
         """
         Récupère les colonnes réellement présentes dans la vue sur la base cible.
@@ -105,7 +114,11 @@ Output one column name per line, no explanation.
         rows = cur.fetchall()
         cur.close()
         return [r[0] for r in rows]
-        def generate_tool_for_command(self, sql_query: str):
+
+    # ----------------------------------------------------------------------
+    # 4. NOUVEAU : Génération d’un tool SQL dynamique (API unifiée)
+    # ----------------------------------------------------------------------
+    def generate_tool_for_command(self, sql_query: str):
         """
         API unifiée avec pgBackRest :
         Génère un tool Python dynamique qui exécute une requête SQL arbitraire.
