@@ -5,12 +5,18 @@ from sentence_transformers import SentenceTransformer
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-class EmbeddingSingleton:
-    _model = None
+# Variable globale au module (vraiment unique)
+_GLOBAL_EMBEDDING_MODEL = None
 
+def get_embedding_model():
+    global _GLOBAL_EMBEDDING_MODEL
+    if _GLOBAL_EMBEDDING_MODEL is None:
+        _GLOBAL_EMBEDDING_MODEL = SentenceTransformer("BAAI/bge-base-en-v1.5")
+    return _GLOBAL_EMBEDDING_MODEL
+
+
+class EmbeddingSingleton:
     @classmethod
     def get_model(cls):
-        if cls._model is None:
-            cls._model = SentenceTransformer("BAAI/bge-base-en-v1.5")
-        return cls._model
+        return get_embedding_model()
 

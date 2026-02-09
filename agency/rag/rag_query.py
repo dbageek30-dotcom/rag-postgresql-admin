@@ -1,11 +1,11 @@
-from sentence_transformers import SentenceTransformer
+from agency.llm.embedding_singleton import EmbeddingSingleton
 from agency.db.connection import conn
 
-# Modèle d'embedding
-embedder = SentenceTransformer("BAAI/bge-base-en-v1.5")
+# Singleton : un seul modèle d'embedding pour toute l'application
+embedder = EmbeddingSingleton.get_model()
 
 def rag_query(query: str, source: str = None, version: str = None):
-    # Génération de l'embedding
+    # Génération de l'embedding via le singleton
     embedding = embedder.encode(query).tolist()
 
     # Conversion en format pgvector : "[0.12,-0.03,...]"
@@ -54,3 +54,4 @@ def rag_query(query: str, source: str = None, version: str = None):
         })
 
     return {"query": query, "results": results}
+
