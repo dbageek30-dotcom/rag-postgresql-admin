@@ -1,4 +1,4 @@
-from agency.agents.toolsmith_agent import ToolsmithAgent
+from agency.agents.toolsmith_postgresql import ToolsmithPostgreSQL
 from agency.db.connection import get_connection
 
 VIEWS_TO_TEST = [
@@ -10,7 +10,7 @@ VIEWS_TO_TEST = [
 
 def main():
     conn = get_connection()
-    agent = ToolsmithAgent()
+    agent = ToolsmithPostgreSQL()
 
     for view in VIEWS_TO_TEST:
         print("\n" + "="*80)
