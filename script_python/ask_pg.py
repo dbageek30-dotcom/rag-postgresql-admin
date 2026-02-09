@@ -63,6 +63,7 @@ def fetch_candidates(question: str, top_k: int = 30, source: str = None):
     emb = get_embedding(question)
 
     conn = psycopg2.connect(**PG_CONN_INFO)
+    conn.set_client_encoding("UTF8")
     cur = conn.cursor()
 
     if source:

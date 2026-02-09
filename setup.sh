@@ -43,7 +43,7 @@ sudo apt install -y postgresql-18 postgresql-18-pgvector postgresql-contrib-18
 # 3. Vérification PostgreSQL
 # ------------------------------------------------------------------------------
 echo ">>> Vérification de PostgreSQL"
-if ! sudo -u postgres psql -c "SELECT 1;" >/dev/null 2>&1; then
+if ! psql -c "SELECT 1;" >/dev/null 2>&1; then
     echo "⚠ PostgreSQL ne semble pas démarré."
     exit 1
 fi
@@ -57,8 +57,8 @@ read -p "Nom de l'utilisateur PostgreSQL (ex: rag_user) : " RAG_USER
 # 5. Création base rag
 # ------------------------------------------------------------------------------
 echo ">>> Création de la base rag si nécessaire"
-if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='rag'" | grep -q 1; then
-    sudo -u postgres psql -c "CREATE DATABASE rag"
+if ! psql -tAc "SELECT 1 FROM pg_database WHERE datname='rag'" | grep -q 1; then
+    psql -c "CREATE DATABASE rag"
 fi
 
 # ------------------------------------------------------------------------------
@@ -66,7 +66,7 @@ fi
 # ------------------------------------------------------------------------------
 echo ">>> Vérification de l'utilisateur PostgreSQL ${RAG_USER}"
 
-USER_EXISTS=$(sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${RAG_USER}'")
+USER_EXISTS=$(psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${RAG_USER}'")
 
 if [ "$USER_EXISTS" = "1" ]; then
     echo ">>> L'utilisateur ${RAG_USER} existe déjà. Aucune création ni mot de passe demandé."
@@ -74,14 +74,14 @@ else
     echo ">>> L'utilisateur ${RAG_USER} n'existe pas. Création..."
     read -s -p "Mot de passe pour ${RAG_USER} : " RAG_PASSWORD
     echo ""
-    sudo -u postgres psql -c "CREATE USER ${RAG_USER} WITH PASSWORD '${RAG_PASSWORD}'"
+    psql -c "CREATE USER ${RAG_USER} WITH PASSWORD '${RAG_PASSWORD}'"
 fi
 
 # ------------------------------------------------------------------------------
 # 7. Création table documents
 # ------------------------------------------------------------------------------
 echo ">>> Création de la table documents"
-sudo -u postgres psql -d rag <<EOF
+psql -d rag <<EOF
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
@@ -93,11 +93,15 @@ CREATE TABLE documents (
     metadata  JSONB NOT NULL,
     embedding vector(768),
     source    TEXT NOT NULL DEFAULT 'unknown',
-    version   TEXT NOT NULL DEFAULT 'unknown'
+    version   TEXT NOT NULL DEFAULT 'unknown',
+    category  TEXT NOT NULL DEFAULT 'general'
 );
 
 CREATE INDEX IF NOT EXISTS documents_embedding_hnsw_idx
     ON documents USING hnsw (embedding vector_l2_ops);
+
+CREATE INDEX IF NOT EXISTS idx_documents_category
+    ON documents(category);
 
 GRANT CONNECT ON DATABASE rag TO ${RAG_USER};
 GRANT USAGE ON SCHEMA public TO ${RAG_USER};
