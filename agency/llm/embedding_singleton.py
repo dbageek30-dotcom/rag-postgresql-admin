@@ -1,18 +1,21 @@
 import os
 from sentence_transformers import SentenceTransformer
 
-# Désactiver les logs AVANT tout import HF
+# Désactiver les logs HF
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# Variable globale au module (vraiment unique)
-_GLOBAL_EMBEDDING_MODEL = None
+# Registre global partagé entre TOUS les modules Python
+import builtins
+
+if not hasattr(builtins, "_GLOBAL_EMBEDDING_MODEL"):
+    builtins._GLOBAL_EMBEDDING_MODEL = None
+
 
 def get_embedding_model():
-    global _GLOBAL_EMBEDDING_MODEL
-    if _GLOBAL_EMBEDDING_MODEL is None:
-        _GLOBAL_EMBEDDING_MODEL = SentenceTransformer("BAAI/bge-base-en-v1.5")
-    return _GLOBAL_EMBEDDING_MODEL
+    if builtins._GLOBAL_EMBEDDING_MODEL is None:
+        builtins._GLOBAL_EMBEDDING_MODEL = SentenceTransformer("BAAI/bge-base-en-v1.5")
+    return builtins._GLOBAL_EMBEDDING_MODEL
 
 
 class EmbeddingSingleton:
