@@ -5,19 +5,30 @@ import numpy as np
 
 # Désactiver les logs HF / Transformers
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
-os.environ["TOKENIZERS_PARALLELISM"] = "false"]
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from sentence_transformers import SentenceTransformer
 
+# ---------------------------------------------------------
+# Ollama (LLM uniquement)
+# ---------------------------------------------------------
 OLLAMA_BASE_URL = "http://10.214.0.8:11434"
 LLM_MODEL = "qwen2.5:7b-instruct-q4_K_M"
+
+# ---------------------------------------------------------
+# Embeddings locaux (HuggingFace)
+# ---------------------------------------------------------
 EMBED_MODEL = "BAAI/bge-base-en-v1.5"
 
 
 class OllamaClient:
     def __init__(self):
+        # Modèle d'embedding local (HF)
         self.embedding_model = SentenceTransformer(EMBED_MODEL)
 
+    # -----------------------------------------------------
+    # 1. Génération LLM via Ollama
+    # -----------------------------------------------------
     def generate(self, prompt: str) -> str:
         url = f"{OLLAMA_BASE_URL}/api/generate"
         payload = {"model": LLM_MODEL, "prompt": prompt, "stream": True}
@@ -42,7 +53,11 @@ class OllamaClient:
 
         return full_text.strip()
 
+    # -----------------------------------------------------
+    # 2. Embeddings locaux (PAS via Ollama)
+    # -----------------------------------------------------
     def embed(self, query: str):
+        # Embedding local HF → pas d'appel HTTP
         vector = self.embedding_model.encode(query)
         return vector.tolist()
 

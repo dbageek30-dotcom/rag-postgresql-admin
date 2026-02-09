@@ -5,7 +5,7 @@ class RAGHybrid:
     """
     Version statique du RAG hybride :
     - filtrage par catégorie
-    - vectoriel simple
+    - vectoriel simple (corrigé avec cast ::vector)
     - règles simples
     - fusion naïve
     """
@@ -37,18 +37,20 @@ class RAGHybrid:
         return "general"
 
     # ----------------------------------------------------------------------
-    # 2. Recherche vectorielle simple
+    # 2. Recherche vectorielle simple (CORRIGÉE)
     # ----------------------------------------------------------------------
     def vector_search(self, query_embedding, category, top_k=5):
         conn = self._connect()
         cur = conn.cursor()
 
+        # On ajoute ::vector après les %s pour transformer la liste Python
+        # en type 'vector' compatible avec l'opérateur <=> de pgvector.
         cur.execute("""
             SELECT id, content, metadata, source, version,
-                   1 - (embedding <=> %s) AS score
+                   1 - (embedding <=> %s::vector) AS score
             FROM documents
             WHERE category = %s
-            ORDER BY embedding <=> %s
+            ORDER BY embedding <=> %s::vector
             LIMIT %s;
         """, (query_embedding, category, query_embedding, top_k))
 
@@ -104,8 +106,17 @@ class RAGHybrid:
     # ----------------------------------------------------------------------
     def merge_results(self, vector_results, rule_results):
         combined = vector_results + rule_results
+        # On trie par score décroissant
         combined.sort(key=lambda x: x["score"], reverse=True)
-        return combined[:5]
+        # On dédoublonne par ID si nécessaire (optionnel selon vos besoins)
+        seen = set()
+        unique_results = []
+        for res in combined:
+            if res["id"] not in seen:
+                unique_results.append(res)
+                seen.add(res["id"])
+        
+        return unique_results[:5]
 
     # ----------------------------------------------------------------------
     # 5. Pipeline complet
@@ -128,4 +139,3 @@ class RAGHybrid:
             "category": category,
             "results": merged
         }
-
