@@ -4,20 +4,25 @@ from dotenv import load_dotenv
 from agency.agents.toolsmith_pgbackrest import ToolsmithPgBackRest
 from agency.agents.toolsmith_agent import ToolsmithAgent  # PostgreSQL
 
+from agency.workers.pgbackrest_worker import PgBackRestWorker
+from agency.workers.postgresql_worker import PostgreSQLWorker
+
 from agency.rag.rag_hybrid import RAGHybrid
 from agency.llm.ollama_client import OllamaClient
 
 
 class ToolOrchestrator:
     """
-    Orchestrateur d’outils et de RAG.
-    Reçoit une décision du Decision Layer et exécute l’action appropriée.
+    Orchestrateur propre :
+    - distingue local vs distant
+    - route Toolsmith → Worker
+    - compatible avec DecisionLayer strict
     """
 
     def __init__(self):
-        # Charger les variables d’environnement
         load_dotenv()
 
+        # Paramètres DB locaux
         self.db_params = {
             "dbname": os.getenv("DB_NAME"),
             "user": os.getenv("DB_USER"),
@@ -26,80 +31,73 @@ class ToolOrchestrator:
             "port": os.getenv("DB_PORT"),
         }
 
+        # Paramètres distants (pgBackRest)
+        self.remote_params = {
+            "ssh_host": os.getenv("REMOTE_HOST"),
+            "ssh_user": os.getenv("REMOTE_USER", "postgres"),
+            "ssh_key": os.getenv("REMOTE_SSH_KEY"),
+            "pgbackrest_bin": os.getenv("PGBACKREST_BIN", "/usr/bin/pgbackrest"),
+        }
+
+        # Toolsmiths
+        self.toolsmiths = {
+            "postgresql": ToolsmithAgent(),
+            "pgbackrest": ToolsmithPgBackRest(),
+        }
+
+        # Workers
+        self.workers = {
+            "postgresql": PostgreSQLWorker(self.db_params),
+            "pgbackrest": PgBackRestWorker(),
+        }
+
     def execute(self, decision: dict):
         action = decision.get("action")
+        payload = decision.get("payload", "")
         args = decision.get("arguments", {})
-        query = decision.get("query", "")
 
-        # ------------------------------------------------------------------
-        # 1. pgBackRest
-        # ------------------------------------------------------------------
-        if action == "tool:pgbackrest":
-            toolsmith = ToolsmithPgBackRest()
-            result = toolsmith.generate_tool_for_command(
-                args.get("command", "info")
-            )
-
-            namespace = {}
-            exec(result["code"], namespace)
-
-            ToolClass = namespace[result["class_name"]]
-            tool = ToolClass(dry_run=False)
-
-            return tool.run(args=args.get("options", {}))
-
-        # ------------------------------------------------------------------
-        # 2. PostgreSQL (via ToolsmithAgent)
-        # ------------------------------------------------------------------
+        # ------------------------------------------------------------
+        # PostgreSQL (local)
+        # ------------------------------------------------------------
         if action == "tool:postgresql":
-            toolsmith = ToolsmithAgent()
-            result = toolsmith.generate_tool_for_command(
-                args.get("command", "")
-            )
+            toolsmith = self.toolsmiths["postgresql"]
+            tool_data = toolsmith.generate_tool_for_command(payload)
 
             namespace = {}
-            exec(result["code"], namespace)
+            exec(tool_data["code"], namespace)
 
-            ToolClass = namespace[result["class_name"]]
-            tool = ToolClass(dry_run=False)
+            ToolClass = namespace[tool_data["class_name"]]
+            tool = ToolClass(**self.db_params)
 
-            return tool.run(args=args.get("options", {}))
+            return tool.run(args=args)
 
-        # ------------------------------------------------------------------
-        # 3. Patroni (placeholder)
-        # ------------------------------------------------------------------
+        # ------------------------------------------------------------
+        # pgBackRest (distant)
+        # ------------------------------------------------------------
+        if action == "tool:pgbackrest":
+            toolsmith = self.toolsmiths["pgbackrest"]
+            tool_data = toolsmith.generate_tool_for_command(payload)
+
+            worker = self.workers["pgbackrest"]
+            return worker.execute_tool(tool_data["code"], self.remote_params)
+
+        # ------------------------------------------------------------
+        # Patroni (placeholder)
+        # ------------------------------------------------------------
         if action == "tool:patroni":
-            return {
-                "error": "Tool Patroni non encore implémenté",
-                "action": action
-            }
+            return {"error": "Tool Patroni non encore implémenté"}
 
-        # ------------------------------------------------------------------
-        # 4. RAG documentaire (hybride)
-        # ------------------------------------------------------------------
+        # ------------------------------------------------------------
+        # RAG documentaire
+        # ------------------------------------------------------------
         if action == "rag:doc":
             rag = RAGHybrid(self.db_params)
-
-            # Embedding via Ollama
             llm = OllamaClient()
-            query_embedding = llm.embed(query=query)
+            query_embedding = llm.embed(query=payload)
+            return rag.query(payload, query_embedding)
 
-            return rag.query(query, query_embedding)
-
-        # ------------------------------------------------------------------
-        # 5. Raisonnement pur
-        # ------------------------------------------------------------------
-        if action == "reasoning-only":
-            return {
-                "reasoning": True,
-                "message": "Pas d'action : reasoning-only."
-            }
-
-        # ------------------------------------------------------------------
-        # 6. Fallback
-        # ------------------------------------------------------------------
-        return {
-            "error": "Action inconnue",
-            "action": action
-        }
+        # ------------------------------------------------------------
+        # Fallback
+        # ------------------------------------------------------------
+        return {"error": "Action inconnue", "action": action}
 
