@@ -1,17 +1,22 @@
 import psycopg2
 import numpy as np
 
+from agency.llm.reranker_singleton import RerankerSingleton
+
+
 class RAGHybrid:
     """
-    Version statique du RAG hybride :
+    Version RAG hybride améliorée :
     - filtrage par catégorie
-    - vectoriel simple (corrigé avec cast ::vector)
+    - vectoriel simple (pgvector)
     - règles simples
     - fusion naïve
+    - reranking CrossEncoder (BAAI/bge-reranker-large)
     """
 
     def __init__(self, db_params):
         self.db_params = db_params
+        self.reranker = RerankerSingleton.get_model()
 
     # ----------------------------------------------------------------------
     # Connexion PostgreSQL
@@ -37,14 +42,12 @@ class RAGHybrid:
         return "general"
 
     # ----------------------------------------------------------------------
-    # 2. Recherche vectorielle simple (CORRIGÉE)
+    # 2. Recherche vectorielle simple
     # ----------------------------------------------------------------------
     def vector_search(self, query_embedding, category, top_k=5):
         conn = self._connect()
         cur = conn.cursor()
 
-        # On ajoute ::vector après les %s pour transformer la liste Python
-        # en type 'vector' compatible avec l'opérateur <=> de pgvector.
         cur.execute("""
             SELECT id, content, metadata, source, version,
                    1 - (embedding <=> %s::vector) AS score
@@ -106,20 +109,34 @@ class RAGHybrid:
     # ----------------------------------------------------------------------
     def merge_results(self, vector_results, rule_results):
         combined = vector_results + rule_results
-        # On trie par score décroissant
         combined.sort(key=lambda x: x["score"], reverse=True)
-        # On dédoublonne par ID si nécessaire (optionnel selon vos besoins)
+
         seen = set()
         unique_results = []
         for res in combined:
             if res["id"] not in seen:
                 unique_results.append(res)
                 seen.add(res["id"])
-        
-        return unique_results[:5]
+
+        return unique_results
 
     # ----------------------------------------------------------------------
-    # 5. Pipeline complet
+    # 5. Reranking CrossEncoder
+    # ----------------------------------------------------------------------
+    def rerank(self, query, results, top_k=5):
+        if not results:
+            return []
+
+        pairs = [(query, r["content"]) for r in results]
+        scores = self.reranker.predict(pairs)
+
+        scored = list(zip(scores, results))
+        scored.sort(key=lambda x: x[0], reverse=True)
+
+        return [r for (_, r) in scored[:top_k]]
+
+    # ----------------------------------------------------------------------
+    # 6. Pipeline complet
     # ----------------------------------------------------------------------
     def query(self, query: str, query_embedding):
         category = self.detect_category(query)
@@ -135,7 +152,10 @@ class RAGHybrid:
                 "message": "Aucun document trouvé, fallback reasoning."
             }
 
+        reranked = self.rerank(query, merged)
+
         return {
             "category": category,
-            "results": merged
+            "results": reranked
         }
+
