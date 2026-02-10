@@ -2,8 +2,10 @@ import os
 import psycopg2
 from psycopg2.extras import Json
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
+
+# Import du singleton silencieux
+from agency.llm.embedding_singleton import EmbeddingSingleton
 
 # ---------------------------------------------------------------------
 # 1. Charger la configuration depuis .env
@@ -17,14 +19,11 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = int(os.getenv("DB_PORT", 5432))
 
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-base-en-v1.5")
-
 # ---------------------------------------------------------------------
-# 2. Charger le modèle d'embedding
+# 2. Charger le modèle d'embedding via le singleton
 # ---------------------------------------------------------------------
 
-print(f"Chargement du modèle d'embedding : {EMBEDDING_MODEL}")
-model = SentenceTransformer(EMBEDDING_MODEL)
+model = EmbeddingSingleton.get_model()
 
 # ---------------------------------------------------------------------
 # 3. Connexion PostgreSQL
