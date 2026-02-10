@@ -1,20 +1,35 @@
 import os
+import logging
 from sentence_transformers import SentenceTransformer
+import builtins
 
-# Désactiver les logs HF
+# Désactiver tous les logs HF / Transformers / tqdm
 os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# Registre global partagé entre TOUS les modules Python
-import builtins
+logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("tqdm").setLevel(logging.ERROR)
 
+# Registre global partagé
 if not hasattr(builtins, "_GLOBAL_EMBEDDING_MODEL"):
     builtins._GLOBAL_EMBEDDING_MODEL = None
 
 
 def get_embedding_model():
     if builtins._GLOBAL_EMBEDDING_MODEL is None:
-        builtins._GLOBAL_EMBEDDING_MODEL = SentenceTransformer("BAAI/bge-base-en-v1.5")
+        model = SentenceTransformer(
+            "BAAI/bge-base-en-v1.5",
+            device="cpu",
+            trust_remote_code=True
+        )
+
+        # Désactiver tqdm au niveau du modèle
+        if hasattr(model, "progress_bar"):
+            model.progress_bar = False
+
+        builtins._GLOBAL_EMBEDDING_MODEL = model
+
     return builtins._GLOBAL_EMBEDDING_MODEL
 
 
