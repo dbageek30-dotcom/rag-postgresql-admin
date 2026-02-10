@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-import json
 import sys, os
+import json
+
+# Ajoute la racine du projet au PYTHONPATH
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# Pré-warm du singleton pour éviter "Loading weights..."
+from agency.llm.embedding_singleton import EmbeddingSingleton
+EmbeddingSingleton.get_model()
 
 from agency.decision.decision_layer import DecisionLayer
-from agency.orchestrator.tool_orchestrator import ToolOrchestrator
+from agency.decision.tool_orchestrator import ToolOrchestrator
 
 def main():
     if len(sys.argv) < 2:
@@ -14,15 +19,15 @@ def main():
 
     question = sys.argv[1]
 
-    # 1. Décision Layer
+    # 1. Decision Layer
     dl = DecisionLayer()
-    decision = dl.route(question)
+    decision = dl.decide(question)
 
     # 2. Orchestrateur
     orchestrator = ToolOrchestrator()
-    result = orchestrator.execute(decision, question)
+    result = orchestrator.execute(decision)
 
-    # 3. Affichage propre
+    # 3. Affichage
     print("\n=== DECISION LAYER ===")
     print(json.dumps(decision, indent=2, ensure_ascii=False))
 
