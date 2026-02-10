@@ -3,9 +3,11 @@ from dotenv import load_dotenv
 
 from agency.agents.toolsmith_pgbackrest import ToolsmithPgBackRest
 from agency.agents.toolsmith_agent import ToolsmithAgent  # PostgreSQL
+from agency.agents.toolsmith_patroni import ToolsmithPatroni
 
 from agency.workers.pgbackrest_worker import PgBackRestWorker
 from agency.workers.postgresql_worker import PostgreSQLWorker
+from agency.workers.patroni_worker import PatroniWorker
 
 from agency.rag.rag_hybrid import RAGHybrid
 from agency.llm.ollama_client import OllamaClient
@@ -39,16 +41,24 @@ class ToolOrchestrator:
             "pgbackrest_bin": os.getenv("PGBACKREST_BIN", "/usr/bin/pgbackrest"),
         }
 
+        # Paramètres Patroni
+        self.patroni_params = {
+            "patroni_bin": os.getenv("PATRONI_BIN", "/usr/bin/patronictl"),
+            "patroni_config": os.getenv("PATRONI_CONFIG", "/etc/patroni.yml"),
+        }
+
         # Toolsmiths
         self.toolsmiths = {
             "postgresql": ToolsmithAgent(),
             "pgbackrest": ToolsmithPgBackRest(),
+            "patroni": ToolsmithPatroni(),
         }
 
         # Workers
         self.workers = {
             "postgresql": PostgreSQLWorker(self.db_params),
             "pgbackrest": PgBackRestWorker(),
+            "patroni": PatroniWorker(self.patroni_params),
         }
 
         # LLM instancié UNE SEULE FOIS
@@ -85,10 +95,14 @@ class ToolOrchestrator:
             return worker.execute_tool(tool_data["code"], self.remote_params)
 
         # ------------------------------------------------------------
-        # Patroni (placeholder)
+        # Patroni
         # ------------------------------------------------------------
         if action == "tool:patroni":
-            return {"error": "Tool Patroni non encore implémenté"}
+            toolsmith = self.toolsmiths["patroni"]
+            tool_data = toolsmith.generate_tool_for_command(payload)
+
+            worker = self.workers["patroni"]
+            return worker.execute_tool(tool_data["code"], self.patroni_params)
 
         # ------------------------------------------------------------
         # RAG documentaire
