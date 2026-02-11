@@ -199,17 +199,35 @@ class RAGHybrid:
     # ----------------------------------------------------------------------
     # 5. Reranking CrossEncoder
     # ----------------------------------------------------------------------
-    def rerank(self, query, results, top_k=5):
+    def rerank(self, query, results):
         if not results:
             return []
 
+        # Nombre de résultats à garder après reranking
+        top_k = int(os.getenv("RAG_RERANK_TOP_K", 5))
+
+        # Préparer les paires (query, chunk)
         pairs = [(query, r["content"]) for r in results]
+
+        # Scores du CrossEncoder
         scores = self.reranker.predict(pairs)
 
-        scored = list(zip(scores, results))
-        scored.sort(key=lambda x: x[0], reverse=True)
+        # Ajouter un score normalisé
+        min_s = min(scores)
+        max_s = max(scores)
+        norm_scores = [
+            (s - min_s) / (max_s - min_s) if max_s > min_s else 1.0
+            for s in scores
+        ]
 
-        return [r for (_, r) in scored[:top_k]]
+        for r, s, ns in zip(results, scores, norm_scores):
+            r["rerank_raw"] = float(s)
+            r["rerank_score"] = float(ns)
+
+        # Trier par score normalisé
+        results = sorted(results, key=lambda x: x["rerank_score"], reverse=True)
+
+        return results[:top_k]
 
     # ----------------------------------------------------------------------
     # 6. Pipeline complet
@@ -253,4 +271,11 @@ class RAGHybrid:
             "category": category,
             "results": reranked
         }
+        # 7. Fallback intelligent basé sur le score du reranker
+        min_conf = float(os.getenv("RAG_MIN_CONFIDENCE", 0.25))
+        best_score = reranked[0].get("rerank_score", 0.0)
+
+        if best_score < min_conf:
+            return {
+                "fallback": True,
 

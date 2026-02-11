@@ -30,5 +30,10 @@ response = rag.query(query, query_embedding)
 print("Catégorie détectée :", response.get("category"))
 print("Résultats :")
 for r in response.get("results", []):
-    print(f"- ID {r['id']} | score={r.get('hybrid_score', r.get('score'))}")
+    print(
+        f"- ID {r['id']} | "
+        f"hybrid={r.get('hybrid_score')} | "
+        f"rerank_raw={r.get('rerank_raw')} | "
+        f"rerank_score={r.get('rerank_score')}"
+    )
 
