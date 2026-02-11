@@ -100,7 +100,7 @@ class ToolOrchestrator:
                 **self.remote_params,
                 "options": tool_data.get("options", {})
             }
-            return worker.execute_tool(tool_data["code"], self.remote_params)
+            return worker.execute_tool(tool_data["code"], pgbackrest_exec_params)
 
         # ------------------------------------------------------------
         # Patroni (distant, dynamique via template)
