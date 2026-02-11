@@ -1,4 +1,5 @@
 import psycopg2
+import os
 import numpy as np
 
 from agency.llm.reranker_singleton import RerankerSingleton
@@ -156,6 +157,46 @@ class RAGHybrid:
         return unique_results
 
     # ----------------------------------------------------------------------
+    # Fusion hybride vector + BM25 (100% dynamique)
+    # ----------------------------------------------------------------------
+    def merge_results_hybrid(self, vector_results, bm25_results):
+        # Lire les pondérations depuis .env
+        w_vec = float(os.getenv("RAG_WEIGHT_VECTOR", 0.7))
+        w_bm25 = float(os.getenv("RAG_WEIGHT_BM25", 0.3))
+
+        # Normalisation générique
+        def normalize(scores):
+            if not scores:
+                return []
+            max_s = max(scores)
+            min_s = min(scores)
+            if max_s == min_s:
+                return [1.0 for _ in scores]
+            return [(s - min_s) / (max_s - min_s) for s in scores]
+
+        # Normaliser vector
+        vec_scores = normalize([r["score"] for r in vector_results])
+        for r, s in zip(vector_results, vec_scores):
+            r["hybrid_score"] = s * w_vec
+
+        # Normaliser BM25
+        bm25_scores = normalize([r["score"] for r in bm25_results])
+        for r, s in zip(bm25_results, bm25_scores):
+            r["hybrid_score"] = s * w_bm25
+
+        # Fusion + déduplication
+        combined = vector_results + bm25_results
+        unique = {}
+        for r in combined:
+            rid = r["id"]
+            if rid not in unique or r["hybrid_score"] > unique[rid]["hybrid_score"]:
+                unique[rid] = r
+
+        # Tri final
+        return sorted(unique.values(), key=lambda x: x["hybrid_score"], reverse=True)
+
+
+    # ----------------------------------------------------------------------
     # 5. Reranking CrossEncoder
     # ----------------------------------------------------------------------
     def rerank(self, query, results, top_k=5):
@@ -173,20 +214,39 @@ class RAGHybrid:
     # ----------------------------------------------------------------------
     # 6. Pipeline complet
     # ----------------------------------------------------------------------
+
     def query(self, query: str, query_embedding):
+        # Lire les options dynamiques
+        use_bm25 = os.getenv("RAG_USE_BM25", "true").lower() == "true"
+        use_hybrid = os.getenv("RAG_USE_HYBRID", "true").lower() == "true"
+        top_k = int(os.getenv("RAG_TOP_K", 5))
+
+        # 1. Détection de catégorie
         category = self.detect_category(query)
 
-        vector_results = self.vector_search(query_embedding, category)
-        rule_results = self.rule_search(query, category)
+        # 2. Recherche vectorielle
+        vector_results = self.vector_search(query_embedding, category, top_k=top_k)
 
-        merged = self.merge_results(vector_results, rule_results)
+        # 3. Recherche lexicale (BM25 ou fallback ILIKE)
+        if use_bm25:
+            bm25_results = self.rule_search_bm25(query, category)
+        else:
+            bm25_results = self.rule_search(query, category)
 
+        # 4. Fusion
+        if use_hybrid:
+            merged = self.merge_results_hybrid(vector_results, bm25_results)
+        else:
+            merged = self.merge_results(vector_results, bm25_results)
+
+        # 5. Fallback si aucun résultat
         if not merged:
             return {
                 "fallback": True,
                 "message": "Aucun document trouvé, fallback reasoning."
             }
 
+        # 6. Reranking final
         reranked = self.rerank(query, merged)
 
         return {
