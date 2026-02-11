@@ -1,52 +1,50 @@
 import os
 import requests
 import json
-import numpy as np
+from dotenv import load_dotenv
 
-# Désactiver les logs HF / Transformers AVANT tout import HF
-os.environ["TRANSFORMERS_VERBOSITY"] = "error"
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+# Charger .env
+load_dotenv()
 
 from agency.llm.embedding_singleton import EmbeddingSingleton
 
-# ---------------------------------------------------------
-# Ollama (LLM uniquement)
-# ---------------------------------------------------------
-OLLAMA_BASE_URL = "http://10.214.0.8:11434"
-LLM_MODEL = "qwen2.5:7b-instruct-q4_K_M"
-
 
 class OllamaClient:
-    def __init__(self):
-        # Singleton : un seul modèle d'embedding pour toute l'application
+    """
+    Client Ollama générique :
+    - modèle configurable via paramètre OU .env
+    - host configurable via paramètre OU .env
+    - supporte /api/chat
+    - embeddings locaux via EmbeddingSingleton
+    """
+
+    def __init__(self, model=None, host=None):
+        # Valeurs par défaut depuis .env
+        self.model = model or os.getenv("OLLAMA_MODEL_DEFAULT")
+        self.host = (host or os.getenv("OLLAMA_HOST")).rstrip("/")
+
+        # Embeddings locaux
         self.embedding_model = EmbeddingSingleton.get_model()
 
     # -----------------------------------------------------
-    # 1. Génération LLM via Ollama
+    # 1. Chat LLM (API moderne)
     # -----------------------------------------------------
-    def generate(self, prompt: str) -> str:
-        url = f"{OLLAMA_BASE_URL}/api/generate"
-        payload = {"model": LLM_MODEL, "prompt": prompt, "stream": True}
+    def chat(self, system_prompt: str, user_prompt: str) -> str:
+        url = f"{self.host}/api/chat"
 
-        response = requests.post(url, json=payload, stream=True, timeout=300)
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+        }
+
+        response = requests.post(url, json=payload, timeout=600)
         response.raise_for_status()
 
-        full_text = ""
-        for line in response.iter_lines():
-            if not line:
-                continue
-            try:
-                data = json.loads(line.decode("utf-8"))
-            except json.JSONDecodeError:
-                continue
-
-            chunk = data.get("response", "")
-            full_text += chunk
-
-            if data.get("done"):
-                break
-
-        return full_text.strip()
+        data = response.json()
+        return data["message"]["content"]
 
     # -----------------------------------------------------
     # 2. Embeddings locaux (PAS via Ollama)
@@ -54,9 +52,4 @@ class OllamaClient:
     def embed(self, query: str):
         vector = self.embedding_model.encode(query)
         return vector.tolist()
-
-
-def llm_query(prompt: str) -> str:
-    client = OllamaClient()
-    return client.generate(prompt)
 

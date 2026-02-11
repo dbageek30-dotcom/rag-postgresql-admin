@@ -1,28 +1,30 @@
+import os
 from agency.templates.tool_template import TOOL_TEMPLATE
 from agency.rag.rag_query import rag_query
 from agency.db.connection import get_connection
-from agency.llm.ollama_client import llm_query
+from agency.llm.ollama_client import OllamaClient
 
 
 class ToolsmithAgent:
     def __init__(self, rag_client=None, llm_client=None):
         """
         Agent chargé de générer dynamiquement des tools PostgreSQL
-        à partir de la documentation officielle (via RAG) et d'un LLM local (Qwen/Ollama).
+        à partir de la documentation officielle (via RAG) et d'un LLM distant (Ollama).
         """
+
+        # RAG (local)
         self.rag = rag_client or rag_query
-        self.llm = llm_client or llm_query
+
+        # Modèle du Toolsmith = modèle par défaut défini dans .env
+        default_model = os.getenv("OLLAMA_MODEL_DEFAULT")
+
+        # Client LLM distant (7B par défaut)
+        self.llm = llm_client or OllamaClient(model=default_model)
 
     # ----------------------------------------------------------------------
     # 1. Génération de tools pour les vues PostgreSQL
     # ----------------------------------------------------------------------
     def generate_tool_for_view(self, view_name: str, version: str, conn=None):
-        """
-        Génère un tool dynamique pour une vue PostgreSQL.
-        Combine :
-        - colonnes trouvées dans la doc (RAG + LLM)
-        - colonnes trouvées dans la DB (source de vérité)
-        """
         if conn is None:
             conn = get_connection()
 
@@ -35,7 +37,7 @@ class ToolsmithAgent:
         # 3. Intersection doc ∩ DB
         final_cols = [c for c in doc_cols if c in db_cols]
 
-        # 4. Fallback si le RAG/LLM ne renvoie rien ou renvoie du bruit
+        # 4. Fallback si le RAG/LLM ne renvoie rien
         if not final_cols:
             final_cols = db_cols
 
@@ -59,10 +61,6 @@ class ToolsmithAgent:
     # 2. Extraction des colonnes depuis la documentation
     # ----------------------------------------------------------------------
     def _get_columns_from_doc(self, view_name: str, version: str):
-        """
-        Utilise le RAG + LLM local (Qwen via Ollama) pour extraire les colonnes de la vue.
-        Comportement permissif, comme dans ta version d’origine.
-        """
         question = (
             f"List all column names of the PostgreSQL system view {view_name} "
             f"for PostgreSQL version {version}. "
@@ -84,7 +82,10 @@ Extract ONLY the column names of this view.
 Output one column name per line, no explanation.
 """
 
-        llm_output = self.llm(prompt)
+        llm_output = self.llm.chat(
+            system_prompt="You extract column names from documentation.",
+            user_prompt=prompt
+        )
 
         cols = []
         for line in llm_output.splitlines():
@@ -98,9 +99,6 @@ Output one column name per line, no explanation.
     # 3. Extraction des colonnes depuis la base
     # ----------------------------------------------------------------------
     def _get_columns_from_db(self, conn, view_name: str):
-        """
-        Récupère les colonnes réellement présentes dans la vue sur la base cible.
-        """
         cur = conn.cursor()
         cur.execute(
             """
@@ -116,14 +114,9 @@ Output one column name per line, no explanation.
         return [r[0] for r in rows]
 
     # ----------------------------------------------------------------------
-    # 4. NOUVEAU : Génération d’un tool SQL dynamique (API unifiée)
+    # 4. Génération d’un tool SQL dynamique
     # ----------------------------------------------------------------------
     def generate_tool_for_command(self, sql_query: str):
-        """
-        API unifiée avec pgBackRest :
-        Génère un tool Python dynamique qui exécute une requête SQL arbitraire.
-        """
-
         class_name = "PostgreSQLDynamicQueryTool"
 
         code = f"""
