@@ -18,26 +18,31 @@ class {class_name}:
 
         # Ajout dynamique des options
         for key, value in self.options.items():
-            cli_opt = f"--{{{{key.replace('_', '-')}}}}"
+            cli_opt = f"--{{key.replace('_', '-')}}"
             if isinstance(value, bool):
                 if value:
                     base_cmd.append(cli_opt)
             elif value is not None:
                 base_cmd.extend([cli_opt, str(value)])
 
-        # Construction de la commande SSH distante
+        # Construction de la commande SSH
+        # Utilisation de f-strings normales ici car nous sommes DANS le code généré
         ssh_cmd = [
             "ssh",
+            "-o", "StrictHostKeyChecking=no",  # Optionnel: évite les blocages TTY
             "-i", self.ssh_key,
-            f"{{{{self.ssh_user}}}}@{{{{self.ssh_host}}}}",
+            f"{{self.ssh_user}}@{{self.ssh_host}}",
             " ".join(base_cmd)
         ]
         return ssh_cmd
 
     def run(self):
         import subprocess
+        import os
 
         cmd = self._build_command()
+        
+        # On s'assure que l'environnement peut lire la clé (optionnel mais recommandé)
         result = subprocess.run(cmd, capture_output=True, text=True)
 
         return {{
@@ -47,4 +52,3 @@ class {class_name}:
             "returncode": result.returncode,
         }}
 """
-

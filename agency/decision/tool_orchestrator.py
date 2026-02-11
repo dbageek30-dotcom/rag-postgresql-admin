@@ -98,14 +98,26 @@ class ToolOrchestrator:
             return worker.execute_tool(tool_data["code"], self.remote_params)
 
         # ------------------------------------------------------------
-        # Patroni
+        # Patroni (distant, dynamique via template)
         # ------------------------------------------------------------
         if action == "tool:patroni":
             toolsmith = self.toolsmiths["patroni"]
-            tool_data = toolsmith.generate_tool_for_command(payload)
+
+            # Le Toolsmith génère : class_name, code, options
+            tool_data = toolsmith.generate_tool_for_command(payload, args)
 
             worker = self.workers["patroni"]
-            return worker.execute_tool(tool_data["code"], self.patroni_params)
+
+            # On passe :
+            # - code généré
+            # - paramètres SSH + patroni_bin + patroni_config
+            # - options dynamiques
+            patroni_params = {
+                **self.patroni_params,
+                "options": tool_data.get("options", {})
+            }
+
+            return worker.execute_tool(tool_data["code"], patroni_params)
 
         # ------------------------------------------------------------
         # RAG documentaire

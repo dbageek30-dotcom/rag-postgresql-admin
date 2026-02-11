@@ -6,8 +6,8 @@ import json
 
 class PatroniWorker:
     """
-    Exécute patronictl sur la machine distante via SSH.
-    Identique à PgBackRestWorker mais adapté à Patroni.
+    Exécute un outil Patroni généré dynamiquement via SSH.
+    Aligné sur le template Patroni dynamique.
     """
 
     def __init__(self, params):
@@ -17,7 +17,17 @@ class PatroniWorker:
         # Injecter les paramètres dans le script
         injected_code = code + f'''
 
-tool = PatroniTool("{params["patroni_bin"]}", "{params["patroni_config"]}")
+import json
+
+tool = PatroniTool(
+    "{params["ssh_host"]}",
+    "{params["ssh_user"]}",
+    "{params["ssh_key"]}",
+    "{params["patroni_bin"]}",
+    "{params["patroni_config"]}",
+    **{json.dumps(params.get("options", {}))}
+)
+
 print(json.dumps(tool.run()))
 '''
 
