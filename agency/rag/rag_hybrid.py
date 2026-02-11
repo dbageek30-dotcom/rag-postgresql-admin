@@ -267,10 +267,6 @@ class RAGHybrid:
         # 6. Reranking final
         reranked = self.rerank(query, merged)
 
-        return {
-            "category": category,
-            "results": reranked
-        }
         # 7. Fallback intelligent basé sur le score du reranker
         min_conf = float(os.getenv("RAG_MIN_CONFIDENCE", 0.25))
         best_score = reranked[0].get("rerank_score", 0.0)
@@ -278,4 +274,14 @@ class RAGHybrid:
         if best_score < min_conf:
             return {
                 "fallback": True,
+                "message": "Les documents trouvés sont peu pertinents, je préfère raisonner sans les utiliser.",
+                "category": category,
+                "results": reranked
+            }
+
+        # 8. Résultat normal
+        return {
+            "category": category,
+            "results": reranked
+        }
 
