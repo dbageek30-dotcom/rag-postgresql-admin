@@ -1,7 +1,6 @@
 import os
-from agency.templates.tool_template import TOOL_TEMPLATE
+from agency.templates.tool_template_postgresql import TOOL_TEMPLATE_POSTGRESQL
 from agency.rag.rag_query import rag_query
-from agency.db.connection import get_connection
 from agency.llm.ollama_client import OllamaClient
 
 
@@ -9,115 +8,103 @@ class ToolsmithPostgreSQL:
     """
     Toolsmith PostgreSQL :
     - interroge la documentation via RAG
-    - croise avec la réalité de la base
-    - génère un tool Python strict et exécutable pour une vue PostgreSQL
+    - extrait une commande SQL ou binaire
+    - génère un tool Python strict basé sur un template
     """
 
     def __init__(self, rag_client=None, llm_client=None):
-        # RAG local
         self.rag = rag_client or rag_query
-
-        # Modèle du Toolsmith = modèle par défaut (7B) défini dans .env
         default_model = os.getenv("OLLAMA_MODEL_DEFAULT")
-
-        # LLM distant (Ollama)
         self.llm = llm_client or OllamaClient(model=default_model)
 
     # ----------------------------------------------------------------------
     # PUBLIC API
     # ----------------------------------------------------------------------
-    def generate_tool_for_view(self, view_name: str, version: str, conn=None):
-        if conn is None:
-            conn = get_connection()
+    def generate_tool(self, user_request: str, version: str):
+        """
+        Génère un tool PostgreSQL basé sur une commande trouvée dans la doc.
+        """
 
-        # 1. Colonnes depuis la doc (RAG + LLM)
-        doc_cols = self._get_columns_from_doc(view_name, version)
+        # 1. Récupérer les passages pertinents via RAG
+        rag_result = self.rag(user_request, source="postgresql", version=version)
+        raw_text = "\n".join(r["content"] for r in rag_result["results"])
 
-        # 2. Colonnes réelles depuis la base
-        db_cols = self._get_columns_from_db(conn, view_name)
+        if not raw_text.strip():
+            raise ValueError("Aucune documentation pertinente trouvée.")
 
-        # 3. Intersection doc ∩ DB
-        final_cols = [c for c in doc_cols if c in db_cols]
+        # 2. Extraire une commande SQL ou binaire
+        command, tool_type = self._extract_command(raw_text)
 
-        # 4. Fallback si le RAG/LLM ne renvoie rien
-        if not final_cols:
-            final_cols = db_cols
+        # 3. Générer le nom de classe
+        class_name = self._make_class_name(command)
 
-        # 5. Génération du code du tool
-        class_name = f"{view_name.title().replace('_', '')}Tool"
-        columns_str = ", ".join(final_cols)
-
-        tool_code = TOOL_TEMPLATE.format(
+        # 4. Générer le code du tool
+        tool_code = TOOL_TEMPLATE_POSTGRESQL.format(
             class_name=class_name,
-            columns=columns_str,
-            view_name=view_name,
+            tool_type=tool_type,
+            command=command
         )
 
         return {
             "class_name": class_name,
-            "columns": final_cols,
-            "code": tool_code,
+            "tool_type": tool_type,
+            "command": command,
+            "code": tool_code
         }
 
     # ----------------------------------------------------------------------
     # INTERNAL METHODS
     # ----------------------------------------------------------------------
-    def _get_columns_from_doc(self, view_name: str, version: str):
+    def _extract_command(self, text: str):
         """
-        Utilise le RAG + OllamaClient.chat() pour extraire les colonnes de la vue.
-        Extraction stricte : une colonne par ligne, aucun bruit.
+        Extraction stricte d'une commande SQL ou binaire.
+        Le LLM n'a pas le droit d'inventer.
         """
-
-        question = (
-            f"List all column names of the PostgreSQL system view {view_name} "
-            f"for PostgreSQL version {version}. "
-            f"Answer with a plain list of column names, one per line."
-        )
-
-        rag_result = self.rag(question, source="postgresql", version=version)
-        raw_text = "\n".join(r["content"] for r in rag_result["results"])
-
-        if not raw_text.strip():
-            return []
 
         prompt = f"""
-Here is documentation text about the PostgreSQL view {view_name}:
+Tu es un extracteur STRICT de commandes PostgreSQL.
+À partir du texte suivant, extrait UNE SEULE commande SQL ou binaire.
 
-{raw_text}
+Règles :
+- Si c'est SQL : retourne exactement la commande SQL complète.
+- Si c'est binaire : retourne uniquement le nom du binaire (ex: pg_dump).
+- Ne modifie rien.
+- Ne complète rien.
+- Ne crée rien.
+- Ne devine rien.
+- Retourne uniquement la commande, rien d'autre.
 
-Extract ONLY the column names of this view.
-Output one column name per line, no explanation.
+Texte :
+{text}
+
+Réponds au format strict :
+TYPE=<sql|binary>
+COMMAND=<commande>
 """
 
         llm_output = self.llm.chat(
-            system_prompt="You extract PostgreSQL column names from documentation.",
+            system_prompt="Extraction stricte de commandes PostgreSQL.",
             user_prompt=prompt
         )
 
-        cols = []
+        tool_type = None
+        command = None
+
         for line in llm_output.splitlines():
-            line = line.strip()
-            if line:
-                cols.append(line)
+            if line.startswith("TYPE="):
+                tool_type = line.replace("TYPE=", "").strip()
+            if line.startswith("COMMAND="):
+                command = line.replace("COMMAND=", "").strip()
 
-        return cols
+        if not tool_type or not command:
+            raise ValueError("Impossible d'extraire une commande valide.")
 
-    def _get_columns_from_db(self, conn, view_name: str):
+        return command, tool_type
+
+    def _make_class_name(self, command: str):
         """
-        Récupère les colonnes réellement présentes dans la vue sur la base cible.
-        Source de vérité absolue.
+        Génère un nom de classe propre basé sur la commande.
         """
-        cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_name = %s
-            ORDER BY ordinal_position
-            """,
-            (view_name,),
-        )
-        rows = cur.fetchall()
-        cur.close()
-        return [r[0] for r in rows]
+        base = command.split()[0].replace(";", "")
+        return base.title().replace("_", "") + "Tool"
 
