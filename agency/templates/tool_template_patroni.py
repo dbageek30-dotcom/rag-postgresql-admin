@@ -11,12 +11,10 @@ class {class_name}:
         self.options = options
 
     def _build_command(self):
-        # Commande de base patronictl
         base_cmd = [self.patroni_bin, "-c", self.config_file, "{command}"]
 
-        # Ajout dynamique des options (ex: --force, --role master, etc.)
         for key, value in self.options.items():
-            cli_opt = f"--{{key.replace('_', '-')}}"
+            cli_opt = f"--{key.replace('_', '-')}"
             if isinstance(value, bool):
                 if value:
                     base_cmd.append(cli_opt)
@@ -27,10 +25,7 @@ class {class_name}:
 
     def run(self):
         import subprocess
-        
         cmd = self._build_command()
-        
-        # Exécution locale sur la VM cible
         result = subprocess.run(cmd, capture_output=True, text=True)
 
         return {{
@@ -40,3 +35,4 @@ class {class_name}:
             "returncode": result.returncode,
         }}
 """
+
