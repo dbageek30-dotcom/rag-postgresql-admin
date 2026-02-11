@@ -18,7 +18,7 @@ class {class_name}:
 
         # Ajout dynamique des options
         for key, value in self.options.items():
-            cli_opt = f"--{key.replace('_', '-')}"
+            cli_opt = f"--{{{{key.replace('_', '-')}}}}"
             if isinstance(value, bool):
                 if value:
                     base_cmd.append(cli_opt)
@@ -29,7 +29,7 @@ class {class_name}:
         ssh_cmd = [
             "ssh",
             "-i", self.ssh_key,
-            f"{self.ssh_user}@{self.ssh_host}",
+            f"{{{{self.ssh_user}}}}@{{{{self.ssh_host}}}}",
             " ".join(base_cmd)
         ]
         return ssh_cmd
