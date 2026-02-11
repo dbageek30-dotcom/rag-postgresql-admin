@@ -2,12 +2,10 @@ TOOL_TEMPLATE_PATRONI = """
 class {class_name}:
     \"""
     Tool Patroni généré dynamiquement.
+    Exécuté localement sur la VM cible via le Worker.
     \"""
 
-    def __init__(self, ssh_host, ssh_user, ssh_key, patroni_bin, config_file, **options):
-        self.ssh_host = ssh_host
-        self.ssh_user = ssh_user
-        self.ssh_key = ssh_key
+    def __init__(self, patroni_bin, config_file, **options):
         self.patroni_bin = patroni_bin
         self.config_file = config_file
         self.options = options
@@ -16,7 +14,7 @@ class {class_name}:
         # Commande de base patronictl
         base_cmd = [self.patroni_bin, "-c", self.config_file, "{command}"]
 
-        # Ajout dynamique des options
+        # Ajout dynamique des options (ex: --force, --role master, etc.)
         for key, value in self.options.items():
             cli_opt = f"--{{key.replace('_', '-')}}"
             if isinstance(value, bool):
@@ -25,24 +23,14 @@ class {class_name}:
             elif value is not None:
                 base_cmd.extend([cli_opt, str(value)])
 
-        # Construction de la commande SSH
-        # Utilisation de f-strings normales ici car nous sommes DANS le code généré
-        ssh_cmd = [
-            "ssh",
-            "-o", "StrictHostKeyChecking=no",  # Optionnel: évite les blocages TTY
-            "-i", self.ssh_key,
-            f"{{self.ssh_user}}@{{self.ssh_host}}",
-            " ".join(base_cmd)
-        ]
-        return ssh_cmd
+        return base_cmd
 
     def run(self):
         import subprocess
-        import os
-
+        
         cmd = self._build_command()
         
-        # On s'assure que l'environnement peut lire la clé (optionnel mais recommandé)
+        # Exécution locale sur la VM cible
         result = subprocess.run(cmd, capture_output=True, text=True)
 
         return {{

@@ -44,7 +44,7 @@ class ToolOrchestrator:
         # Paramètres Patroni
         self.patroni_params = {
             "patroni_bin": os.getenv("PATRONI_BIN", "/usr/bin/patronictl"),
-            "patroni_config": os.getenv("PATRONI_CONFIG", "/etc/patroni.yml"),
+            "config_file": os.getenv("PATRONI_CONFIG", "/etc/patroni.yml"),
             "ssh_host": os.getenv("REMOTE_HOST"), 
             "ssh_user": os.getenv("REMOTE_USER", "postgres"), 
             "ssh_key": os.getenv("REMOTE_SSH_KEY"),
