@@ -1,5 +1,6 @@
 import os
 import psycopg2
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from tqdm import tqdm
@@ -17,7 +18,8 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = int(os.getenv("DB_PORT", 5432))
 
-CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 250))
+CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 450))
+CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", 80))
 
 print("=== Configuration utilisée ===")
 print(f"Dossier racine : {BASE_DIR}")
@@ -48,20 +50,14 @@ except Exception as e:
 # 3. Chunking
 # ============================
 
-def chunk_text(text, max_tokens=250):
-    words = text.split()
-    chunks = []
-    start = 0
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=CHUNK_SIZE,
+    chunk_overlap=CHUNK_OVERLAP,
+    separators=["\n\n", "\n", ". ", " "]
+)
 
-    while start < len(words):
-        end = start + max_tokens
-        chunk_words = words[start:end]
-        chunk_text = " ".join(chunk_words)
-        if chunk_text.strip():
-            chunks.append(chunk_text)
-        start = end
-
-    return chunks
+def chunk_text(text):
+    return splitter.split_text(text)
 
 # ============================
 # 4. Vérification du dossier racine
@@ -144,7 +140,7 @@ for source in sorted(os.listdir(BASE_DIR)):
                 if not content.strip():
                     continue
 
-                chunks = chunk_text(content, max_tokens=CHUNK_SIZE)
+                chunks = chunk_text(content)
 
                 for i, chunk in enumerate(chunks):
                     # Vérifier si ce chunk existe déjà
