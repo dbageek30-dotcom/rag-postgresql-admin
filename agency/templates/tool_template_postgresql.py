@@ -1,49 +1,37 @@
 TOOL_TEMPLATE_POSTGRESQL = """
 class {class_name}:
-    \"\"\"
-    Tool auto-généré pour PostgreSQL.
-    Type: {tool_type}
-    \"\"\"
+    def __init__(self, **kwargs):
+        # On stocke tout : dbname, user, password, host, port, etc.
+        self.config = kwargs
 
-    def __init__(self, dbname, user, password, host, port):
-        self.dbname = dbname
-        self.user = user
-        self.password = password
-        self.host = host
-        self.port = port
-
-    def run(self, **kwargs):
-        import subprocess
+    def run(self):
         import psycopg2
+        import subprocess
         from psycopg2.extras import RealDictCursor
 
-        # --- LOGIQUE SQL ---
+        # --- MODE SQL ---
         if "{tool_type}" == "sql":
             query = {command_repr}
             try:
-                # Connexion utilisant uniquement les paramètres injectés
+                # La connexion n'est créée qu'ici, au moment du run()
                 conn = psycopg2.connect(
-                    dbname=self.dbname,
-                    user=self.user,
-                    password=self.password,
-                    host=self.host,
-                    port=self.port
+                    dbname=self.config.get("dbname"),
+                    user=self.config.get("user"),
+                    password=self.config.get("password"),
+                    host=self.config.get("host"),
+                    port=self.config.get("port")
                 )
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    cur.execute(query, kwargs)
-                    if cur.description:
-                        result = cur.fetchall()
-                    else:
-                        conn.commit()
-                        result = {{"status": "success", "rowcount": cur.rowcount}}
+                    cur.execute(query)
+                    result = cur.fetchall() if cur.description else {{"status": "success", "rows": cur.rowcount}}
                 conn.close()
                 return result
             except Exception as e:
                 return {{"status": "error", "message": str(e)}}
 
-        # --- LOGIQUE BINAIRE ---
+        # --- MODE BINAIRE ---
         if "{tool_type}" == "binary":
-            # Exécution brute de la commande telle quelle
+            # Ici on pourrait construire la commande binaire si besoin
             cmd = ["{command}"]
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True)
