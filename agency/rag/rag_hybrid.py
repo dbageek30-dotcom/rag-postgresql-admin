@@ -105,6 +105,41 @@ class RAGHybrid:
         ]
 
     # ----------------------------------------------------------------------
+    # 3b. Recherche lexicale BM25 (tsvector)
+    # ----------------------------------------------------------------------
+    def rule_search_bm25(self, query: str, category: str, top_k=5):
+        conn = self._connect()
+        cur = conn.cursor()
+
+        # Conversion de la requête en tsquery
+        cur.execute("""
+            SELECT id, content, metadata, source, version,
+                   ts_rank(tsv, plainto_tsquery(%s)) AS score
+            FROM documents
+            WHERE category = %s
+              AND tsv @@ plainto_tsquery(%s)
+            ORDER BY score DESC
+            LIMIT %s;
+        """, (query, category, query, top_k))
+
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        return [
+            {
+                "id": r[0],
+                "content": r[1],
+                "metadata": r[2],
+                "source": r[3],
+                "version": r[4],
+                "score": float(r[5])
+            }
+            for r in rows
+        ]
+
+
+    # ----------------------------------------------------------------------
     # 4. Fusion naïve
     # ----------------------------------------------------------------------
     def merge_results(self, vector_results, rule_results):
