@@ -1,3 +1,4 @@
+import os
 from agency.templates.tool_template import TOOL_TEMPLATE
 from agency.rag.rag_query import rag_query
 from agency.db.connection import get_connection
@@ -13,22 +14,19 @@ class ToolsmithPostgreSQL:
     """
 
     def __init__(self, rag_client=None, llm_client=None):
-        # RAG : interface simple (question, source, version)
+        # RAG local
         self.rag = rag_client or rag_query
 
-        # LLM : nouvelle API OllamaClient
-        self.llm = llm_client or OllamaClient()
+        # Modèle du Toolsmith = modèle par défaut (7B) défini dans .env
+        default_model = os.getenv("OLLAMA_MODEL_DEFAULT")
+
+        # LLM distant (Ollama)
+        self.llm = llm_client or OllamaClient(model=default_model)
 
     # ----------------------------------------------------------------------
     # PUBLIC API
     # ----------------------------------------------------------------------
     def generate_tool_for_view(self, view_name: str, version: str, conn=None):
-        """
-        Génère un tool dynamique pour une vue PostgreSQL.
-        Combine :
-        - colonnes trouvées dans la doc (RAG + LLM)
-        - colonnes trouvées dans la DB (source de vérité)
-        """
         if conn is None:
             conn = get_connection()
 
@@ -41,7 +39,7 @@ class ToolsmithPostgreSQL:
         # 3. Intersection doc ∩ DB
         final_cols = [c for c in doc_cols if c in db_cols]
 
-        # 4. Fallback si le RAG/LLM ne renvoie rien ou renvoie du bruit
+        # 4. Fallback si le RAG/LLM ne renvoie rien
         if not final_cols:
             final_cols = db_cols
 
@@ -66,9 +64,10 @@ class ToolsmithPostgreSQL:
     # ----------------------------------------------------------------------
     def _get_columns_from_doc(self, view_name: str, version: str):
         """
-        Utilise le RAG + OllamaClient pour extraire les colonnes de la vue.
+        Utilise le RAG + OllamaClient.chat() pour extraire les colonnes de la vue.
         Extraction stricte : une colonne par ligne, aucun bruit.
         """
+
         question = (
             f"List all column names of the PostgreSQL system view {view_name} "
             f"for PostgreSQL version {version}. "
@@ -90,7 +89,10 @@ Extract ONLY the column names of this view.
 Output one column name per line, no explanation.
 """
 
-        llm_output = self.llm.generate(prompt)
+        llm_output = self.llm.chat(
+            system_prompt="You extract PostgreSQL column names from documentation.",
+            user_prompt=prompt
+        )
 
         cols = []
         for line in llm_output.splitlines():

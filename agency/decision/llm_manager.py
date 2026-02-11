@@ -1,7 +1,8 @@
 # agency/decision/llm_manager.py
 
-from agency.llm.ollama_client import OllamaClient
+import os
 import json
+from agency.llm.ollama_client import OllamaClient
 
 
 class LLMManager:
@@ -14,8 +15,12 @@ class LLMManager:
     - renvoie une décision structurée
     """
 
-    def __init__(self, model: str = "qwen2.5:32b-instruct-q4_K_M"):
-        self.llm = OllamaClient(model=model)
+    def __init__(self, model: str = None):
+        # Modèle du LLM Manager = modèle 32B défini dans .env
+        manager_model = model or os.getenv("OLLAMA_MODEL_MANAGER")
+
+        # Client LLM distant
+        self.llm = OllamaClient(model=manager_model)
 
         self.system_prompt = """
 Tu es le LLM Manager d'un orchestrateur DBA.
@@ -46,31 +51,11 @@ FORMAT DE SORTIE STRICT (JSON uniquement) :
   "arguments": {}
 }
 
-- "type" :
-    * "doc"    → on enverra "payload" au RAG
-    * "action" → on enverra "payload" + "arguments" au ToolOrchestrator
-
-- "action" :
-    * "patroni"    → pour les opérations de cluster
-    * "pgbackrest" → pour les backups/restores
-    * "postgresql" → pour les requêtes SQL
-    * null         → si type = "doc"
-
-- "payload" :
-    * si type = "doc"    → la question documentaire
-    * si type = "action" → la commande principale (ex: "switchover", "backup", "SELECT ...")
-
-- "arguments" :
-    * dictionnaire d'options structurées (ex: {"leader": "pg_data_1", "force": true})
-
 Ne mets JAMAIS de texte en dehors du JSON.
 Ne commente PAS le JSON.
 """
 
     def route(self, query: str) -> dict:
-        """
-        Transforme une requête utilisateur en décision structurée.
-        """
         user_prompt = f"""
 Analyse cette requête utilisateur et renvoie UNIQUEMENT le JSON demandé :
 
@@ -82,7 +67,6 @@ Analyse cette requête utilisateur et renvoie UNIQUEMENT le JSON demandé :
         try:
             data = json.loads(raw)
         except Exception:
-            # Fallback ultra-sécurisé : tout va au RAG
             data = {
                 "type": "doc",
                 "action": None,
@@ -90,7 +74,6 @@ Analyse cette requête utilisateur et renvoie UNIQUEMENT le JSON demandé :
                 "arguments": {}
             }
 
-        # Normalisation minimale
         if data.get("type") not in ["doc", "action"]:
             data["type"] = "doc"
             data["action"] = None
