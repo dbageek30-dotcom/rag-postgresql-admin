@@ -6,35 +6,30 @@ import json
 import os
 
 class PatroniWorker:
-    """
-    Exécute un outil Patroni généré dynamiquement sur une VM distante.
-    Process : SCP du script généré -> SSH python3 execution -> Nettoyage.
-    """
-
     def __init__(self, params=None):
-        # On peut stocker des params par défaut si besoin
         self.params = params or {}
 
     def execute_tool(self, code: str, params: dict):
-        """
-        code: Le code de la classe généré par le Toolsmith
-        params: Dictionnaire contenant ssh_host, ssh_user, ssh_key, patroni_bin, config_file
-        """
-        # 1. Injecter l'instanciation et l'appel à .run() à la fin du code généré
-        # On utilise PatroniTool car c'est le nom de classe par défaut du ToolsmithPatroni
+        # 1. Préparation sécurisée des options pour l'injection
+        # On récupère les options et on s'assure qu'elles sont traitées comme un dict Python
+        options_dict = params.get("options", {})
+
+        # On génère le code en utilisant repr() pour que True devienne True et non true
         injected_code = code + f'''
 import json
+
+options = {repr(options_dict)}
 
 tool = PatroniTool(
     patroni_bin="{params["patroni_bin"]}",
     config_file="{params["config_file"]}",
-    **{json.dumps(params.get("options", {}))}
+    **options
 )
 
 print(json.dumps(tool.run()))
 '''
 
-        # 2. Écrire le script complet dans un fichier temporaire local
+        # 2. Écriture du script temporaire
         with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
             f.write(injected_code)
             f.flush()
@@ -43,45 +38,30 @@ print(json.dumps(tool.run()))
         remote_path = "/tmp/patroni_tool_exec.py"
 
         try:
-            # 3. SCP : Envoyer le script sur la VM distante
+            # 3. Transfert SCP
             subprocess.run(
-                [
-                    "scp", "-i", params["ssh_key"], 
-                    "-o", "StrictHostKeyChecking=no",
-                    local_path, 
-                    f"{params['ssh_user']}@{params['ssh_host']}:{remote_path}"
-                ],
+                ["scp", "-i", params["ssh_key"], "-o", "StrictHostKeyChecking=no",
+                 local_path, f"{params['ssh_user']}@{params['ssh_host']}:{remote_path}"],
                 check=True, capture_output=True
             )
 
-            # 4. SSH : Exécuter le script sur la VM distante
+            # 4. Exécution SSH
             cmd = [
-                "ssh", "-i", params["ssh_key"], 
-                "-o", "StrictHostKeyChecking=no",
+                "ssh", "-i", params["ssh_key"], "-o", "StrictHostKeyChecking=no",
                 f"{params['ssh_user']}@{params['ssh_host']}",
                 f"python3 {remote_path}"
             ]
 
             result = subprocess.run(cmd, capture_output=True, text=True)
             
-            # 5. Nettoyage distant (optionnel mais propre)
-            subprocess.run([
-                "ssh", "-i", params["ssh_key"], 
-                f"{params['ssh_user']}@{params['ssh_host']}", 
-                f"rm {remote_path}"
-            ], capture_output=True)
+            # Nettoyage distant
+            subprocess.run(["ssh", "-i", params["ssh_key"], f"{params['ssh_user']}@{params['ssh_host']}", f"rm {remote_path}"], capture_output=True)
 
-            # On essaie de parser le JSON retourné par le script distant
             try:
                 return json.loads(result.stdout)
-            except json.JSONDecodeError:
-                return {
-                    "stdout": result.stdout,
-                    "stderr": result.stderr,
-                    "returncode": result.returncode
-                }
+            except:
+                return {"stdout": result.stdout, "stderr": result.stderr, "returncode": result.returncode}
 
         finally:
-            # Nettoyage du fichier temporaire local
             if os.path.exists(local_path):
                 os.remove(local_path)

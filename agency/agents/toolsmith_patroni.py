@@ -4,17 +4,18 @@ from agency.templates.tool_template_patroni import TOOL_TEMPLATE_PATRONI
 class ToolsmithPatroni:
     def generate_tool_for_command(self, payload: str, arguments: dict = None):
         """
-        Découpe le payload pour séparer la commande principale des arguments CLI.
+        Découpe le payload pour séparer la commande principale des arguments CLI
+        et injecte automatiquement les flags de sécurité pour l'automatisation.
         """
         # Nettoyage et découpage en liste de mots
         parts = payload.strip().split()
-        
+
         if not parts:
             return {"error": "No command provided"}
 
         # La commande principale est toujours le premier mot (ex: 'list', 'switchover')
         main_command = parts[0]
-        
+
         # Initialisation des options
         options = arguments or {}
 
@@ -25,7 +26,7 @@ class ToolsmithPatroni:
             if part.startswith('--'):
                 # Nettoyage de la clé pour Python (ex: --leader -> leader)
                 key = part.lstrip('-').replace('-', '_')
-                
+
                 # Vérifie si le mot suivant est une valeur ou un autre flag
                 if i + 1 < len(parts) and not parts[i+1].startswith('--'):
                     options[key] = parts[i+1]
@@ -35,11 +36,16 @@ class ToolsmithPatroni:
                     options[key] = True
                     i += 1
             else:
-                # Argument positionnel (souvent ignoré par patronictl en dehors de la commande)
+                # Argument positionnel
                 i += 1
 
+        # --- SÉCURITÉ : GESTION DE L'INTERACTIVITÉ ---
+        # On force l'option 'force' pour les commandes qui demandent normalement confirmation
+        critical_commands = ['switchover', 'failover', 'restart', 'reinit', 'reload']
+        if main_command in critical_commands:
+            options['force'] = True
+
         # Injection dans le template
-        # On passe PatroniTool comme class_name par convention
         code = TOOL_TEMPLATE_PATRONI.format(
             class_name="PatroniTool",
             command=main_command
