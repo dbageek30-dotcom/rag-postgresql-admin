@@ -20,14 +20,14 @@ class ToolsmithPostgreSQL:
     # ----------------------------------------------------------------------
     # PUBLIC API
     # ----------------------------------------------------------------------
-    def generate_tool(self, user_request: str, version: str):
+    def generate_tool(self, user_request: str, version: str = "18.1"):
         """
         Génère un tool PostgreSQL basé sur une commande trouvée dans la doc.
         """
 
         # 1. Récupérer les passages pertinents via RAG
         rag_result = self.rag(user_request, source="postgresql", version=version)
-        raw_text = "\n".join(r["content"] for r in rag_result["results"])
+        raw_text = "\n".join(r["content"] for r in rag_result.get("results", []))
 
         if not raw_text.strip():
             raise ValueError("Aucune documentation pertinente trouvée.")
@@ -38,11 +38,12 @@ class ToolsmithPostgreSQL:
         # 3. Générer le nom de classe
         class_name = self._make_class_name(command)
 
-        # 4. Générer le code du tool
+        # 4. Générer le code du tool (Injection sécurisée du command_repr)
         tool_code = TOOL_TEMPLATE_POSTGRESQL.format(
             class_name=class_name,
             tool_type=tool_type,
-            command=command
+            command=command,
+            command_repr=repr(command) # Ajout indispensable pour le template
         )
 
         return {
@@ -58,9 +59,7 @@ class ToolsmithPostgreSQL:
     def _extract_command(self, text: str):
         """
         Extraction stricte d'une commande SQL ou binaire.
-        Le LLM n'a pas le droit d'inventer.
         """
-
         prompt = f"""
 Tu es un extracteur STRICT de commandes PostgreSQL.
 À partir du texte suivant, extrait UNE SEULE commande SQL ou binaire.
@@ -92,12 +91,12 @@ COMMAND=<commande>
 
         for line in llm_output.splitlines():
             if line.startswith("TYPE="):
-                tool_type = line.replace("TYPE=", "").strip()
+                tool_type = line.replace("TYPE=", "").strip().lower()
             if line.startswith("COMMAND="):
                 command = line.replace("COMMAND=", "").strip()
 
         if not tool_type or not command:
-            raise ValueError("Impossible d'extraire une commande valide.")
+            raise ValueError(f"Impossible d'extraire une commande valide de l'output : {llm_output}")
 
         return command, tool_type
 
@@ -106,5 +105,6 @@ COMMAND=<commande>
         Génère un nom de classe propre basé sur la commande.
         """
         base = command.split()[0].replace(";", "")
-        return base.title().replace("_", "") + "Tool"
-
+        # Nettoyage supplémentaire pour les binaires (retrait des chemins si présents)
+        base = os.path.basename(base)
+        return base.title().replace("_", "").replace("-", "") + "Tool"
