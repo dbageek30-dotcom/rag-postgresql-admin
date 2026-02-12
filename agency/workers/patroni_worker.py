@@ -7,9 +7,7 @@ class PatroniWorker:
     Worker Patroni :
     - reçoit une instruction structurée du manager
     - charge dynamiquement le tool généré par le Toolsmith Patroni
-    - instancie le tool avec les paramètres SSH
-    - exécute le tool (toujours binaire)
-    - renvoie un résultat strict (JSON)
+    - exécute le tool en lui passant les paramètres SSH
     """
 
     def __init__(self):
@@ -24,7 +22,7 @@ class PatroniWorker:
                     "details": f"PatroniWorker cannot handle endpoint {instruction.get('endpoint')}"
                 }
 
-            # Chargement dynamique du tool
+            # Charger dynamiquement le tool
             namespace = {}
             exec(instruction["tool_code"], namespace)
 
@@ -36,14 +34,14 @@ class PatroniWorker:
                     "details": f"Class {instruction['tool_class']} not found in tool_code"
                 }
 
-            # Payload = paramètres SSH
+            # Payload SSH
             payload = instruction.get("payload", {})
 
-            # Instanciation du tool
-            tool = ToolClass(**payload)
+            # Instancier le tool (sans arguments)
+            tool = ToolClass()
 
-            # Exécution
-            result = tool.run()
+            # Exécuter en passant le payload
+            result = tool.run(payload)
 
             return {
                 "status": "ok",
