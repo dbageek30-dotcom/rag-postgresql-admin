@@ -41,8 +41,6 @@ class PostgreSQLWorker:
             payload = instruction.get("payload", {})
 
             # Instanciation du tool
-            # - SQL : on passe conn=self.conn
-            # - Binaire : on passe ssh_host, ssh_user, ssh_key, etc.
             tool_type = instruction.get("tool_type")
 
             if tool_type == "sql":
@@ -54,4 +52,21 @@ class PostgreSQLWorker:
             result = tool.run()
 
             return {
+                "status": "ok",
+                "result": result
+            }
+
+        except Exception as e:
+            # rollback obligatoire si SQL a échoué
+            try:
+                self.conn.rollback()
+            except:
+                pass
+
+            return {
+                "status": "error",
+                "error": "execution_failed",
+                "details": str(e),
+                "traceback": traceback.format_exc()
+            }
 
