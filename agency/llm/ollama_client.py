@@ -55,45 +55,48 @@ class OllamaClient:
         return vector.tolist()
 
     # -----------------------------------------------------
-    # 3. Génération d'une commande Patroni via le LLM Toolsmith
+    # 3. Génération d'un AST/JSON Patroni via le LLM Toolsmith
     # -----------------------------------------------------
-    def generate_patroni_command(self, llm_input: dict) -> str:
+    def generate_patroni_ast(self, llm_input: dict) -> str:
         """
-        Génère une commande Patroni exacte à partir :
+        Génère un AST/JSON Patroni à partir :
         - de l'action structurée
-        - du contexte (cluster_name, target, member, etc.)
+        - du contexte
         - de la documentation RAG
-        - des chemins binaires Patroni
         """
 
-        action = llm_input["action"]
-        context = llm_input["context"]
-        docs = llm_input["docs"]
-        patroni_bin = llm_input["patroni_bin"]
-        config_file = llm_input["config_file"]
-
-        # Prompt système : rôle strict
         system_prompt = (
-            "You are an expert in generating exact Patroni shell commands. "
-            "You read documentation and output ONLY the final command. "
-            "No explanation. No markdown. No comments. Only the command."
+            "You are a Toolsmith LLM. Your job is to generate a structured AST/JSON describing a Patroni command.\n"
+            "You MUST NOT generate shell commands.\n"
+            "You MUST NOT generate text outside JSON.\n"
+            "You MUST NOT invent flags or arguments that are not present in the documentation provided.\n"
+            "\n"
+            "Your output MUST be a JSON object with the following structure:\n"
+            "{\n"
+            "  \"tool\": \"patroni\",\n"
+            "  \"command\": \"<command_name>\",\n"
+            "  \"positional_args\": [ ... ],\n"
+            "  \"flags\": {\n"
+            "      \"<flag>\": <value>\n"
+            "  }\n"
+            "}\n"
+            "\n"
+            "Rules:\n"
+            "- Only output JSON.\n"
+            "- No explanations.\n"
+            "- No markdown.\n"
+            "- No shell syntax.\n"
         )
 
-        # Prompt utilisateur : données structurées + doc RAG
         user_prompt = f"""
-Action: {action}
-Context: {context}
+Action request:
+{json.dumps(llm_input["context"], indent=2)}
 
-Patroni binary: {patroni_bin}
-Config file: {config_file}
+Relevant Patroni documentation:
+{llm_input["docs"]}
 
-Relevant documentation extracted from RAG:
-{docs}
-
-Generate the exact Patroni command for this action.
-Return ONLY the command, nothing else.
+Generate the AST/JSON for this Patroni command.
 """
 
-        response = self.chat(system_prompt, user_prompt)
-        return response.strip()
+        return self.chat(system_prompt, user_prompt)
 
