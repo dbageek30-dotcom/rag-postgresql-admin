@@ -19,13 +19,13 @@ class {class_name}:
             return {{"status": "error", "message": "Paramètres SSH manquants pour exécuter Patroni."}}
 
         # Commande complète générée par le Toolsmith
-        base_cmd = shlex.split({command_repr})
+        base_cmd = shlex.split({command})
 
         ssh_cmd = [
             "ssh",
             "-i", self.ssh_key,
             "-o", "StrictHostKeyChecking=no",
-            f"{self.ssh_user}@{self.ssh_host}",
+            f"{{self.ssh_user}}@{{self.ssh_host}}",
             " ".join(base_cmd)
         ]
 

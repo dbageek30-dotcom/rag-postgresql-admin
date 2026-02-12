@@ -2,6 +2,9 @@
 
 import os
 from agency.templates.tool_template_patroni import TOOL_TEMPLATE_PATRONI
+from dotenv import load_dotenv
+load_dotenv()
+
 
 
 class ToolsmithPatroni:
@@ -57,7 +60,7 @@ class ToolsmithPatroni:
 
         tool_code = TOOL_TEMPLATE_PATRONI.format(
             class_name=class_name,
-            command=command
+            command=repr(command)
         )
 
         return {
