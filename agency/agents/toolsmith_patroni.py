@@ -35,6 +35,10 @@ class ToolsmithPatroni:
 
         patroni_bin = os.getenv("PATRONI_BIN")
         config_file = os.getenv("PATRONI_CONFIG")
+        leader_host = os.getenv("PATRONI_LEADER_HOST")
+        leader_user = os.getenv("PATRONI_LEADER_USER")
+        leader_key  = os.getenv("PATRONI_LEADER_SSH_KEY")
+
 
         if not patroni_bin or not config_file:
             raise ValueError("Variables d'environnement PATRONI_BIN ou PATRONI_CONFIG manquantes.")
@@ -46,6 +50,7 @@ class ToolsmithPatroni:
 
             command = (
                 f"{patroni_bin} -c {config_file} edit-config "
+                f"--force "
                 f"--set postgresql.parameters.{param}={value}"
             )
 

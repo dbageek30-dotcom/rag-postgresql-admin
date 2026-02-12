@@ -43,9 +43,10 @@ def test_chain_patroni():
         "tool_class": toolsmith_output["tool_class"],
         "tool_code": toolsmith_output["tool_code"],
         "payload": {
-            "ssh_host": os.getenv("REMOTE_HOST"),
-            "ssh_user": os.getenv("REMOTE_USER"),
-            "ssh_key": os.getenv("REMOTE_SSH_KEY")
+            "ssh_host": os.getenv("PATRONI_LEADER_HOST"),
+            "ssh_user": os.getenv("PATRONI_LEADER_USER"),
+            "ssh_key": os.getenv("PATRONI_LEADER_SSH_KEY")
+
         }
     }
 
