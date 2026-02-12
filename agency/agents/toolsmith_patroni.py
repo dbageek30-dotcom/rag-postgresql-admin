@@ -3,6 +3,7 @@
 import os
 from dotenv import load_dotenv
 from agency.templates.tool_template_patroni import TOOL_TEMPLATE_PATRONI
+from agency.llm.embedding_singleton import EmbeddingSingleton
 
 load_dotenv()
 
@@ -11,31 +12,17 @@ class ToolsmithPatroni:
     """
     Toolsmith Patroni :
     - reçoit une demande structurée du DBA Manager (action, contexte, version)
-    - interroge le RAG Patroni via rag_client
-    - utilise le LLM (qwen2.5 7B) pour lire la doc et composer la commande Patroni exacte
-    - génère un tool Python déterministe basé sur un template, prêt pour le worker
+    - interroge le RAG Patroni pour récupérer la documentation pertinente
+    - utilise le LLM pour extraire et composer la commande Patroni exacte
+    - génère un tool Python déterministe basé sur un template
     """
 
     def __init__(self, rag_client, llm_client):
-        """
-        rag_client : client RAG déjà configuré (BM25 + vecteurs, etc.)
-        llm_client : client LLM (Ollama qwen2.5:7b-instruct-q4_K_M)
-        """
         self.rag = rag_client
         self.llm = llm_client
+        self.embedder = EmbeddingSingleton.get_model()
 
     def generate_tool(self, action: str, context: dict):
-        """
-        Génère un tool Patroni basé sur une action structurée.
-
-        Exemple de context :
-            {
-                "version": "3.3.0",
-                "cluster_name": "pgcluster",
-                "target": "leader",
-                ...
-            }
-        """
 
         patroni_bin = os.getenv("PATRONI_BIN")
         config_file = os.getenv("PATRONI_CONFIG")
@@ -47,11 +34,20 @@ class ToolsmithPatroni:
         if not version:
             raise ValueError("La version de Patroni doit être fournie dans le context (clé 'version').")
 
-        # 1. Interroger le RAG Patroni pour cette version + action
+        # ---------------------------------------------------------
+        # 1. Construire la requête RAG
+        # ---------------------------------------------------------
         query = f"patroni version {version} commande pour action '{action}'"
-        docs = self.rag.query(query)
+        embedding = self.embedder.encode(query).tolist()
 
-        # 2. Appel explicite au LLM Toolsmith (7B) pour composer la commande
+        # ---------------------------------------------------------
+        # 2. Interroger le RAG correctement
+        # ---------------------------------------------------------
+        docs = self.rag.query(query, embedding)
+
+        # ---------------------------------------------------------
+        # 3. Appeler le LLM Toolsmith (7B)
+        # ---------------------------------------------------------
         llm_input = {
             "action": action,
             "context": context,
@@ -60,13 +56,14 @@ class ToolsmithPatroni:
             "config_file": config_file,
         }
 
-        # 👉 C’est ICI que ton qwen2.5:7b est utilisé
         command = self.llm.generate_patroni_command(llm_input)
 
         if not isinstance(command, str) or not command.strip():
             raise ValueError("Le LLM n'a pas renvoyé de commande Patroni valide.")
 
-        # 3. Génération du code Python déterministe via le template
+        # ---------------------------------------------------------
+        # 4. Générer le tool Python déterministe
+        # ---------------------------------------------------------
         class_name = f"Patroni{action.title().replace('_', '')}Tool"
 
         tool_code = TOOL_TEMPLATE_PATRONI.format(

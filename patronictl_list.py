@@ -37,19 +37,17 @@ context = {
     "cluster_name": "pgcluster"
 }
 
+# 7. Construire la requête RAG
 query = f"patroni version {context['version']} commande pour action '{action}'"
-embedding = embedder.encode(query)
+embedding = embedder.encode(query).tolist()
 
-# 7. Interroger le RAG
+# 8. Interroger le RAG
 docs = rag.query(query, embedding)
 
-# 8. Générer le tool
-tool = toolsmith.generate_tool(action, {
-    **context,
-    "docs": docs
-})
+# 9. Générer le tool via le Toolsmith
+tool = toolsmith.generate_tool(action, context)
 
-# 9. Préparer l’instruction Worker
+# 10. Préparer l’instruction Worker
 worker_instruction = {
     "endpoint": "/patroni",
     "tool_type": tool["tool_type"],
@@ -62,7 +60,7 @@ worker_instruction = {
     }
 }
 
-# 10. Exécuter
+# 11. Exécuter
 result = worker.execute(worker_instruction)
 print(result)
 
