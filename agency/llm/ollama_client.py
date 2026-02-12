@@ -54,3 +54,46 @@ class OllamaClient:
         vector = self.embedding_model.encode(query)
         return vector.tolist()
 
+    # -----------------------------------------------------
+    # 3. Génération d'une commande Patroni via le LLM Toolsmith
+    # -----------------------------------------------------
+    def generate_patroni_command(self, llm_input: dict) -> str:
+        """
+        Génère une commande Patroni exacte à partir :
+        - de l'action structurée
+        - du contexte (cluster_name, target, member, etc.)
+        - de la documentation RAG
+        - des chemins binaires Patroni
+        """
+
+        action = llm_input["action"]
+        context = llm_input["context"]
+        docs = llm_input["docs"]
+        patroni_bin = llm_input["patroni_bin"]
+        config_file = llm_input["config_file"]
+
+        # Prompt système : rôle strict
+        system_prompt = (
+            "You are an expert in generating exact Patroni shell commands. "
+            "You read documentation and output ONLY the final command. "
+            "No explanation. No markdown. No comments. Only the command."
+        )
+
+        # Prompt utilisateur : données structurées + doc RAG
+        user_prompt = f"""
+Action: {action}
+Context: {context}
+
+Patroni binary: {patroni_bin}
+Config file: {config_file}
+
+Relevant documentation extracted from RAG:
+{docs}
+
+Generate the exact Patroni command for this action.
+Return ONLY the command, nothing else.
+"""
+
+        response = self.chat(system_prompt, user_prompt)
+        return response.strip()
+
