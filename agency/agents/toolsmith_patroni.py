@@ -6,74 +6,64 @@ from agency.templates.tool_template_patroni import TOOL_TEMPLATE_PATRONI
 
 class ToolsmithPatroni:
     """
-    Toolsmith Patroni :
-    - ne fait PAS appel au LLM
-    - ne fait PAS appel au RAG
-    - parse les commandes Patroni
-    - applique les règles de sécurité (--force)
-    - génère un tool Python dynamique
+    Nouveau Toolsmith Patroni :
+    - génère une commande Patroni complète
+    - ne fait pas appel au LLM (Patroni est purement CLI)
+    - produit un tool Python déterministe basé sur un template
     """
 
     def __init__(self):
-        pass  # Pas de LLM ici, Patroni est purement CLI
+        pass
 
-    def generate_tool_for_command(self, payload: str, arguments: dict = None):
+    def generate_tool(self, intent: str, context: dict):
         """
-        Découpe le payload pour séparer la commande principale des arguments CLI
-        et injecte automatiquement les flags de sécurité pour l'automatisation.
+        Génère un tool Patroni basé sur une intention structurée.
+        Exemple d'intention :
+            intent = "modifier un paramètre postgresql"
+            context = {
+                "parameter": "wal_level",
+                "value": "logical"
+            }
         """
 
-        parts = payload.strip().split()
-        if not parts:
-            return {"error": "No command provided"}
+        # ---------------------------------------------------------
+        # 1. Construire la commande Patroni
+        # ---------------------------------------------------------
 
-        # Commande principale : list, switchover, failover, restart, etc.
-        main_command = parts[0]
+        patroni_bin = os.getenv("PATRONI_BIN")
+        config_file = os.getenv("PATRONI_CONFIG")
 
-        # Options CLI
-        options = arguments or {}
+        if not patroni_bin or not config_file:
+            raise ValueError("Variables d'environnement PATRONI_BIN ou PATRONI_CONFIG manquantes.")
 
-        # Parsing manuel des flags CLI
-        i = 1
-        while i < len(parts):
-            part = parts[i]
-            if part.startswith('--'):
-                key = part.lstrip('-').replace('-', '_')
+        # Exemple : patronictl -c /etc/patroni/patroni.yml edit-config --set postgresql.parameters.wal_level=logical
+        if intent == "modifier un paramètre postgresql":
+            param = context["parameter"]
+            value = context["value"]
 
-                # --key=value
-                if '=' in part:
-                    k, v = part.lstrip('-').split('=', 1)
-                    options[k.replace('-', '_')] = v
-                    i += 1
-                    continue
+            command = (
+                f"{patroni_bin} -c {config_file} edit-config "
+                f"--set postgresql.parameters.{param}={value}"
+            )
 
-                # --key value
-                if i + 1 < len(parts) and not parts[i+1].startswith('--'):
-                    options[key] = parts[i+1]
-                    i += 2
-                else:
-                    # Flag booléen
-                    options[key] = True
-                    i += 1
-            else:
-                i += 1
+            class_name = f"PatroniSet{param.title().replace('_','')}Tool"
 
-        # Sécurité : forcer --force sur les commandes critiques
-        critical_commands = ['switchover', 'failover', 'restart', 'reinit', 'reload']
-        if main_command in critical_commands:
-            options['force'] = True
+        else:
+            raise ValueError(f"Intent Patroni non supporté : {intent}")
 
-        # Génération du code Python dynamique
-        class_name = f"Patroni{main_command.title()}Tool"
+        # ---------------------------------------------------------
+        # 2. Générer le code Python déterministe
+        # ---------------------------------------------------------
 
-        code = TOOL_TEMPLATE_PATRONI.format(
+        tool_code = TOOL_TEMPLATE_PATRONI.format(
             class_name=class_name,
-            command=main_command
+            command=command
         )
 
         return {
-            "class_name": class_name,
-            "code": code,
-            "options": options
+            "tool_type": "binary",
+            "tool_class": class_name,
+            "tool_code": tool_code,
+            "command": command
         }
 

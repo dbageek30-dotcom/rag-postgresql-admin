@@ -2,37 +2,42 @@ TOOL_TEMPLATE_PATRONI = """
 class {class_name}:
     \"""
     Tool Patroni généré dynamiquement.
-    Exécuté localement sur la VM cible via le Worker.
+    Exécute une commande Patroni complète via SSH.
     \"""
 
-    def __init__(self, patroni_bin, config_file, **options):
-        self.patroni_bin = patroni_bin
-        self.config_file = config_file
-        self.options = options
-
-    def _build_command(self):
-        base_cmd = [self.patroni_bin, "-c", self.config_file, "{command}"]
-
-        for key, value in self.options.items():
-            cli_opt = f"--{key.replace('_', '-')}"
-            if isinstance(value, bool):
-                if value:
-                    base_cmd.append(cli_opt)
-            elif value is not None:
-                base_cmd.extend([cli_opt, str(value)])
-
-        return base_cmd
+    def __init__(self, ssh_host=None, ssh_user=None, ssh_key=None, **params):
+        self.ssh_host = ssh_host
+        self.ssh_user = ssh_user
+        self.ssh_key = ssh_key
+        self.params = params
 
     def run(self):
         import subprocess
-        cmd = self._build_command()
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        import shlex
 
-        return {{
-            "command": " ".join(cmd),
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "returncode": result.returncode,
-        }}
+        if not self.ssh_host or not self.ssh_user or not self.ssh_key:
+            return {{"status": "error", "message": "Paramètres SSH manquants pour exécuter Patroni."}}
+
+        # Commande complète générée par le Toolsmith
+        base_cmd = shlex.split({command_repr})
+
+        ssh_cmd = [
+            "ssh",
+            "-i", self.ssh_key,
+            "-o", "StrictHostKeyChecking=no",
+            f"{self.ssh_user}@{self.ssh_host}",
+            " ".join(base_cmd)
+        ]
+
+        try:
+            result = subprocess.run(ssh_cmd, capture_output=True, text=True)
+            return {{
+                "command": " ".join(ssh_cmd),
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "returncode": result.returncode
+            }}
+        except Exception as e:
+            return {{"status": "error", "message": str(e)}}
 """
 
